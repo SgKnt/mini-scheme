@@ -1,5 +1,5 @@
 use regex::Regex;
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 
 pub struct Token {
     value: String,
@@ -17,19 +17,13 @@ pub enum TokenKind {
 }
 
 impl Token {
-    pub fn new<T: Into<String>>(value: T, kind: TokenKind) -> Self {
+    pub fn new(value: Option<&str>, kind: TokenKind) -> Self {
         match kind {
-            TokenKind::Num | TokenKind::Bool | TokenKind::Id 
-                => Token{value: value.into(), kind: kind},
-            TokenKind::Str 
-                => Token{value: format!("\"{}\"", value.into()), kind: kind},
+            TokenKind::Num | TokenKind::Bool | TokenKind::Id | TokenKind::Str
+                => Token{value: value.unwrap().into(), kind: kind},
             TokenKind::Pair{..} | TokenKind::Empty | TokenKind::Symbol{..}
-                => Self::new_novalue(kind)
+                => Token{value: String::new(), kind: kind}
         }
-    }
-
-    pub fn new_novalue(kind: TokenKind) -> Self {
-        Token{value: String::new(), kind: kind}
     }
 }
 
@@ -55,33 +49,53 @@ impl Lexer {
 
     fn token(&self, cursor: &mut usize) -> Result<Token> {
         if !(*cursor < self.input.len()) {
-            return Err(anyhow!("lex error: index out of bounds"));
+            bail!("lexical analyzer error: index out of bounds");
         }
 
         match self.input.as_bytes()[*cursor] {
-            b'(' => {
+            b'('  => {
                 *cursor += 1;
-                self.skip_whitespace(cursor).context("lex error: unterminated parenthesis")?;
+                self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
                 self.token_pair(cursor)
             },
+            b')'  => Err(anyhow!("syntax error: extra close parenthesis")),
             b'\'' => {
                 *cursor += 1;
                 self.skip_whitespace(cursor).context("syntax error: unterminated quote")?;
                 self.token(cursor)
-                    .map(|t| Token::new_novalue(TokenKind::Symbol(Box::new(t))))
+                    .map(|t| Token::new(None, TokenKind::Symbol(Box::new(t))))
             },
-            b'"' => {
+            b'"'  => {
                 *cursor += 1;
                 self.token_str(cursor)
-            }
-            _ => {
-                self.token_id_or_literal(cursor)
-            }
+            },
+            _     => self.token_id_or_literal(cursor)
         }
     }
     
     fn token_pair(&self, cursor: &mut usize) -> Result<Token> {
-        todo!()
+        if self.input.as_bytes()[*cursor] == b')' {
+            // ()
+            *cursor += 1;
+            return Ok(Token::new(None, TokenKind::Empty));
+        }
+
+        let car = self.token(cursor)?;
+        
+        self.skip_whitespace(cursor).context("syntex error: unterminated parenthesis")?;
+
+        if self.input.as_bytes()[*cursor] == b'.' {
+            *cursor += 1;
+            self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
+            let cdr = self.token(cursor)?;
+            self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
+            *cursor += 1;
+            Ok(Token::new(None, TokenKind::Pair{car: Box::new(car), cdr: Box::new(cdr)}))
+
+        } else {
+            let cdr = self.token_pair(cursor)?;
+            Ok(Token::new(None, TokenKind::Pair{car: Box::new(car), cdr: Box::new(cdr)}))
+        }
     }
 
     fn token_str(&self, cursor: &mut usize) -> Result<Token> {
