@@ -1,15 +1,41 @@
+use std::fmt;
 use regex::Regex;
 use once_cell::sync::Lazy;
 use anyhow::{Context, Result, anyhow, bail};
 
 pub enum Token {
-    Num(i32),
+    Int(i32),
+    Float(f64),
     Bool(bool),
     Id(String),
     Str(String),
     Pair{car: Box<Token>, cdr: Box<Token>},
     Empty,
     Symbol(Box<Token>),
+}
+
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Int(i) => write!(f, "{}[int]", i),
+            Token::Float(fl) => write!(f, "{}[float]", fl),
+            Token::Bool(b) if *b => write!(f, "#t[bool]"),
+            Token::Bool(_) => write!(f, "#f[bool]"),
+            Token::Id(id) => write!(f, "{}[id]", id),
+            Token::Str(s) => write!(f, "\"{}\"[string]", s),
+            Token::Pair{car, cdr} => match **cdr {
+                Token::Pair{..} | Token::Empty => {
+                    let cdr = format!("{:?}", cdr);
+                    write!(f, "({:?} {}", car, cdr.split_at(1).1)
+                },
+                _ => {
+                    write!(f, "({:?} {:?})", car, cdr)
+                }
+            }
+            Token::Empty => write!(f, "()"),
+            Token::Symbol(s) => write!(f, "'{:?}", s)
+        }
+    }
 }
 
 pub struct Lexer {
@@ -102,19 +128,60 @@ impl Lexer {
     fn token_str(&self, cursor: &mut usize) -> Result<Token> {
         static RE_STRING: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^(\\"|[^"])*"#).unwrap());
         let mat = RE_STRING.find(self.input.split_at(*cursor).1).unwrap();
-        let end_str = *cursor + mat.end();
+        let start = *cursor;
+        let end = *cursor + mat.end();
         
-        if !(end_str < self.input.len()) {
+        if !(end < self.input.len()) {
             Err(anyhow!("read error: unterminated string"))
         } else {
-            let res = Token::Str(self.input.get(*cursor..(end_str)).unwrap().to_string());
-            *cursor = end_str + 1;
-            Ok(res)
+            *cursor = end + 1;
+            Ok(Token::Str(self.input.get(start..end).unwrap().to_string()))
         }
     }
 
     fn token_id_or_literal(&self, cursor: &mut usize) -> Result<Token> {
-        todo!()
+        static RE_FLOAT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\+-]?(\d*\.\d*([Ee][\+-]?\d+)?|\d+e[\+-]?\d+)[\(\)'\s]").unwrap());
+        static RE_FLOAT_NOINT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(?P<sign>[\+-]).").unwrap());
+        static RE_INT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\d+[\(\)'\s]").unwrap());
+        static RE_BOOL: Lazy<Regex> = Lazy::new(|| Regex::new(r"^#[ft][\(\)'\s]").unwrap());
+        static RE_ID: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[[:alnum:]!\$%&\*\+-\./<=>\?@\^_]+[\(\)'\s]").unwrap());
+        static RE_SEP: Lazy<Regex> = Lazy::new(|| Regex::new(r"[\(\)\s']").unwrap());
+
+        let input_from_cursor = self.input.split_at(*cursor).1;
+        if let Some(_) = RE_PERIOD.find(input_from_cursor) {
+            *cursor += 1;
+            Err(anyhow!("read error: dot in wrong context"))
+        } else if let Some(mat) = RE_FLOAT.find(input_from_cursor) {
+            let (start, end) = (*cursor, *cursor + mat.end() - 1);
+            *cursor = end;
+            Ok(Token::Float(RE_FLOAT_NOINT
+                .replace(self.input.get(start..end).unwrap(), "${sign}0.")
+                .parse()
+                .unwrap()))
+        } else if let Some(mat) = RE_INT.find(input_from_cursor) {
+            let (start, end) = (*cursor, *cursor + mat.end() - 1);
+            *cursor = end;
+            Ok(Token::Int(self.input
+                .get(start..end)
+                .unwrap()
+                .parse()
+                .unwrap()))
+        } else if let Some(_) = RE_BOOL.find(input_from_cursor) {
+            *cursor += 2;
+            if input_from_cursor.as_bytes()[1] == b'f' {
+                Ok(Token::Bool(false))
+            } else {
+                Ok(Token::Bool(true))
+            }
+        } else if let Some(mat) = RE_ID.find(input_from_cursor) {
+            let (start, end) = (*cursor, *cursor + mat.end() - 1);
+            *cursor = end + 1;
+            Ok(Token::Id(self.input.get(start..end).unwrap().to_string()))
+        } else {
+            let end = RE_SEP.find(input_from_cursor).map(|m| m.end());
+            *cursor = if let Some(end) = end {*cursor + end} else {self.input.len()};
+            Err(anyhow!("read error: invalid character"))
+        }
     }
 
     fn skip_whitespace(&self, cursor: &mut usize) -> Option<()> {
