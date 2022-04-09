@@ -7,18 +7,19 @@ fn read_stdin() -> io::Result<String> {
     loop {
         io::stdin().read_line(&mut buf)?;
 
-        let has_read = is_unterminated_paren_or_string(&buf);
+        let has_read = !in_unterminated_paren_or_string(&buf);
         if has_read {
             break;
         }
     }
-    Ok(buf.trim().to_string())
+    Ok(buf)
 }
 
-fn is_unterminated_paren_or_string(buf: &str) -> bool {
-    let mut prev_c = b' ';
-    let mut nest = 0;           // the number of layers of nesting
+fn in_unterminated_paren_or_string(buf: &str) -> bool {
+    let mut nest = 0;           // the number of layers of nesting ()
     let mut in_str = false;    // between " " ?
+
+    let mut prev_c = b' ';
     for c in buf.as_bytes() {
         if !in_str {
             match c {
@@ -36,7 +37,7 @@ fn is_unterminated_paren_or_string(buf: &str) -> bool {
         }
         prev_c = *c;
     }
-    nest == 0 && !in_str
+    nest != 0 || in_str
 }
 
 fn main() {

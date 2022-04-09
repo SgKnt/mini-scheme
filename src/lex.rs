@@ -1,5 +1,5 @@
 use regex::Regex;
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
 use anyhow::{Context, Result, anyhow, bail};
 
 pub enum Token {
@@ -15,6 +15,8 @@ pub enum Token {
 pub struct Lexer {
     input: String
 }
+
+static RE_PERIOD: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\.[\(\)'\s]").unwrap());
 
 impl Lexer {
     pub fn new(input: String) -> Self {
@@ -40,13 +42,13 @@ impl Lexer {
         match self.input.as_bytes()[*cursor] {
             b'('  => {
                 *cursor += 1;
-                self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
+                self.skip_whitespace(cursor).context("read error: unterminated parenthesis")?;
                 self.token_pair(cursor)
             },
-            b')'  => Err(anyhow!("syntax error: extra close parenthesis")),
+            b')'  => Err(anyhow!("read error: extra close parenthesis")),
             b'\'' => {
                 *cursor += 1;
-                self.skip_whitespace(cursor).context("syntax error: unterminated quote")?;
+                self.skip_whitespace(cursor).context("read error: unterminated quote")?;
                 self.token(cursor)
                     .map(|t| Token::Symbol(Box::new(t)))
             },
@@ -54,12 +56,13 @@ impl Lexer {
                 *cursor += 1;
                 self.token_str(cursor)
             },
+            _ if RE_PERIOD.is_match(self.input.split_at(*cursor).1) => 
+                Err(anyhow!("read error: dot in wrong context")),
             _     => self.token_id_or_literal(cursor)
         }
     }
     
     fn token_pair(&self, cursor: &mut usize) -> Result<Token> {
-        static RE_PERIOD: OnceCell<Regex> = OnceCell::new();
         if self.input.as_bytes()[*cursor] == b')' {
             // ()
             *cursor += 1;
@@ -68,26 +71,46 @@ impl Lexer {
 
         let car = self.token(cursor)?;
         
-        self.skip_whitespace(cursor).context("syntex error: unterminated parenthesis")?;
-        if RE_PERIOD.get_or_init(|| Regex::new(r"^\.[\(\s]").unwrap()).is_match(self.input.split_at(*cursor).1) {
-            *cursor += 1;
-            self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
-            let cdr = self.token(cursor)?;
-            self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
-            *cursor += 1;
-            Ok(Token::Pair{car: Box::new(car), cdr: Box::new(cdr)})
+        self.skip_whitespace(cursor).context("read error: unterminated parenthesis")?;
+        if self.input.split_at(*cursor).1.starts_with(".)") {
+            // (a .)
+            *cursor += 2;
+            Err(anyhow!("read error: dot in wrong context"))
 
-        } else if self.input.split_at(*cursor).1.starts_with(".)") {
-            Err(anyhow!("syntax error: dot in wrong context"))
+        } else if RE_PERIOD.is_match(self.input.split_at(*cursor).1) {
+            // (a . b)
+            *cursor += 1;
+            self.skip_whitespace(cursor).context("read error: unterminated parenthesis")?;
+            let cdr = self.token(cursor)?;
+            self.skip_whitespace(cursor).context("read error: unterminated parenthesis")?;
+            if self.input.as_bytes()[*cursor] == b')' {
+                *cursor += 1;
+                Ok(Token::Pair{car: Box::new(car), cdr: Box::new(cdr)})
+            } else {
+                // (a . b c)
+                *cursor += 1;
+                Err(anyhow!("read error: bad dot syntax"))
+            }
 
         } else {
+            // (a b)
             let cdr = self.token_pair(cursor)?;
             Ok(Token::Pair{car: Box::new(car), cdr: Box::new(cdr)})
         }
     }
 
     fn token_str(&self, cursor: &mut usize) -> Result<Token> {
-        todo!()
+        static RE_STRING: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^(\\"|[^"])*"#).unwrap());
+        let mat = RE_STRING.find(self.input.split_at(*cursor).1).unwrap();
+        let end_str = *cursor + mat.end();
+        
+        if !(end_str < self.input.len()) {
+            Err(anyhow!("read error: unterminated string"))
+        } else {
+            let res = Token::Str(self.input.get(*cursor..(end_str)).unwrap().to_string());
+            *cursor = end_str + 1;
+            Ok(res)
+        }
     }
 
     fn token_id_or_literal(&self, cursor: &mut usize) -> Result<Token> {
