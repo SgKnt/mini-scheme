@@ -2,30 +2,14 @@ use regex::Regex;
 use once_cell::sync::OnceCell;
 use anyhow::{Context, Result, anyhow, bail};
 
-pub struct Token {
-    value: String,
-    kind: TokenKind,
-}
-
-pub enum TokenKind {
-    Num,
-    Bool,
-    Id,
-    Str,
+pub enum Token {
+    Num(i32),
+    Bool(bool),
+    Id(String),
+    Str(String),
     Pair{car: Box<Token>, cdr: Box<Token>},
     Empty,
     Symbol(Box<Token>),
-}
-
-impl Token {
-    pub fn new(value: Option<&str>, kind: TokenKind) -> Self {
-        match kind {
-            TokenKind::Num | TokenKind::Bool | TokenKind::Id | TokenKind::Str
-                => Token{value: value.unwrap().into(), kind: kind},
-            TokenKind::Pair{..} | TokenKind::Empty | TokenKind::Symbol{..}
-                => Token{value: String::new(), kind: kind}
-        }
-    }
 }
 
 pub struct Lexer {
@@ -64,7 +48,7 @@ impl Lexer {
                 *cursor += 1;
                 self.skip_whitespace(cursor).context("syntax error: unterminated quote")?;
                 self.token(cursor)
-                    .map(|t| Token::new(None, TokenKind::Symbol(Box::new(t))))
+                    .map(|t| Token::Symbol(Box::new(t)))
             },
             b'"'  => {
                 *cursor += 1;
@@ -79,7 +63,7 @@ impl Lexer {
         if self.input.as_bytes()[*cursor] == b')' {
             // ()
             *cursor += 1;
-            return Ok(Token::new(None, TokenKind::Empty));
+            return Ok(Token::Empty);
         }
 
         let car = self.token(cursor)?;
@@ -91,14 +75,14 @@ impl Lexer {
             let cdr = self.token(cursor)?;
             self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
             *cursor += 1;
-            Ok(Token::new(None, TokenKind::Pair{car: Box::new(car), cdr: Box::new(cdr)}))
+            Ok(Token::Pair{car: Box::new(car), cdr: Box::new(cdr)})
 
         } else if self.input.split_at(*cursor).1.starts_with(".)") {
             Err(anyhow!("syntax error: dot in wrong context"))
 
         } else {
             let cdr = self.token_pair(cursor)?;
-            Ok(Token::new(None, TokenKind::Pair{car: Box::new(car), cdr: Box::new(cdr)}))
+            Ok(Token::Pair{car: Box::new(car), cdr: Box::new(cdr)})
         }
     }
 
