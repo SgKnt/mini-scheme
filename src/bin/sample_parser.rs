@@ -1,11 +1,6 @@
-use std::io;
+use regex::Regex;
 
 fn main() {
-    let mut buf = String::new();
-    let mut v: Vec<char> = Vec::new();
-    io::stdin().read_line(&mut buf).expect("error");
-    for c in buf.chars() {
-        v.push(c);
-    }
-    println!("{:?}", v);
+    let re = Regex::new(r"^\.[\(\)'\s]?$").unwrap();
+    assert!(re.is_match(" . ".split_at(1).1));
 }

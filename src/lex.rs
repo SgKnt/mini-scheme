@@ -1,4 +1,5 @@
 use regex::Regex;
+use once_cell::sync::OnceCell;
 use anyhow::{Context, Result, anyhow, bail};
 
 pub struct Token {
@@ -74,6 +75,7 @@ impl Lexer {
     }
     
     fn token_pair(&self, cursor: &mut usize) -> Result<Token> {
+        static RE_PERIOD: OnceCell<Regex> = OnceCell::new();
         if self.input.as_bytes()[*cursor] == b')' {
             // ()
             *cursor += 1;
@@ -83,14 +85,16 @@ impl Lexer {
         let car = self.token(cursor)?;
         
         self.skip_whitespace(cursor).context("syntex error: unterminated parenthesis")?;
-
-        if self.input.as_bytes()[*cursor] == b'.' {
+        if RE_PERIOD.get_or_init(|| Regex::new(r"^\.[\(\s]").unwrap()).is_match(self.input.split_at(*cursor).1) {
             *cursor += 1;
             self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
             let cdr = self.token(cursor)?;
             self.skip_whitespace(cursor).context("syntax error: unterminated parenthesis")?;
             *cursor += 1;
             Ok(Token::new(None, TokenKind::Pair{car: Box::new(car), cdr: Box::new(cdr)}))
+
+        } else if self.input.split_at(*cursor).1.starts_with(".)") {
+            Err(anyhow!("syntax error: dot in wrong context"))
 
         } else {
             let cdr = self.token_pair(cursor)?;
