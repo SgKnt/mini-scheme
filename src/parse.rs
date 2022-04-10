@@ -40,15 +40,15 @@ impl fmt::Debug for Token {
 }
 
 
-pub struct Lexer {
+pub struct Parser {
     input: String
 }
 
 static RE_PERIOD: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\.([\(\)'\s]|$)").unwrap());
 
-impl Lexer {
+impl Parser {
     pub fn new(input: String) -> Self {
-        Lexer{input: input}
+        Parser{input: input}
     }
 
     pub fn build_tokens(&self) -> Vec<Result<Token>> {
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn lex_float() {
-        let lex = Lexer::new(r"23.4 -.0098e3 .".to_string());
+        let lex = Parser::new(r"23.4 -.0098e3 .".to_string());
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "23.4[float]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "-9.8[float]");
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn lex_int() {
-        let lex = Lexer::new(r"234 0098".to_string());
+        let lex = Parser::new(r"234 0098".to_string());
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "234[int]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "98[int]");
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn lex_string() {
-        let lex = Lexer::new(r#""hoge" "fああueo84()79" "hogefuga"#.to_string());
+        let lex = Parser::new(r#""hoge" "fああueo84()79" "hogefuga"#.to_string());
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), r#""hoge"[string]"#);
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), r#""fああueo84()79"[string]"#);
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn lex_bool() {
-        let lex = Lexer::new(r"#t #f #t42 #f#t".to_string());
+        let lex = Parser::new(r"#t #f #t42 #f#t".to_string());
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "#t[bool]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "#f[bool]");
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn lex_id() {
-        let lex = Lexer::new(r"hoge fuga あ #123 piyo".to_string());
+        let lex = Parser::new(r"hoge fuga あ #123 piyo".to_string());
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "hoge[id]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "fuga[id]");
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn lex_symble() {
-        let lex = Lexer::new(r#"'123 '1.23e-3 '"foo" '#t '''bar"#.to_string());
+        let lex = Parser::new(r#"'123 '1.23e-3 '"foo" '#t '''bar"#.to_string());
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "'123[int]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "'0.00123[float]");
@@ -285,18 +285,18 @@ mod tests {
 
     #[test]
     fn lex_pair() {
-        let lex1 = Lexer::new(r#"() (() ()) (() . (() . ())))"#.to_string());
+        let lex1 = Parser::new(r#"() (() ()) (() . (() . ())))"#.to_string());
         let tokens1 = lex1.build_tokens();
         assert_eq!(format!("{:?}", tokens1.get(0).unwrap().as_ref().unwrap()), "()");
         assert_eq!(format!("{:?}", tokens1.get(1).unwrap().as_ref().unwrap()), "(() ())");
         assert_eq!(format!("{:?}", tokens1.get(2).unwrap().as_ref().unwrap()), "(() ())");
         assert_eq!(format!("{:?}", tokens1.get(3).unwrap().as_ref().err()), "Some(read error: extra close parenthesis)");
 
-        let lex2 = Lexer::new(r#"(define ls '(1 2 3 4))"#.to_string());
+        let lex2 = Parser::new(r#"(define ls '(1 2 3 4))"#.to_string());
         let tokens2 = lex2.build_tokens();
         assert_eq!(format!("{:?}", tokens2.get(0).unwrap().as_ref().unwrap()), "(define[id] ls[id] '(1[int] 2[int] 3[int] 4[int]))");
 
-        let lex3 = Lexer::new(
+        let lex3 = Parser::new(
         r#"
         (define (fact n)
           (if (eq? n 0)
