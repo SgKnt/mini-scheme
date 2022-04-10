@@ -2,6 +2,8 @@ pub mod lex;
 
 use std::io;
 
+use lex::Lexer;
+
 fn read_stdin() -> io::Result<String> {
     let mut buf = String::new();
     loop {
@@ -42,5 +44,12 @@ fn in_unterminated_paren_or_string(buf: &str) -> bool {
 
 fn main() {
     let input = read_stdin().unwrap();
-    println!("{}", input);
+    let lex = Lexer::new(input);
+    let tokens = lex.build_tokens();
+    for token in tokens {
+        match token {
+            Ok(token) => println!("{:?}", token),
+            Err(err) => println!("{:?}", err),
+        }
+    }
 }
