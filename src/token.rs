@@ -13,7 +13,7 @@ pub enum Token {
 
 impl Token {
     // (a ..) -> a
-    pub fn first(&self) -> Option<&Self> {
+    pub fn elem(&self) -> Option<&Self> {
         match &self {
             Token::Pair{car, ..} => Some(car.as_ref()),
             _ => None,
@@ -21,8 +21,6 @@ impl Token {
     }
 
     // (a ..) -> ..
-    // e.g. (a b c).next() -> (b c)
-    //      (a b c).next().first() -> b
     pub fn next(&self) -> Option<&Self> {
         if let Token::Pair{car: _, cdr} = &self {
             if let Token::Pair{..} = &**cdr {
@@ -84,10 +82,19 @@ impl fmt::Debug for Token {
     }
 }
 
-struct TokenIter<'a> {
+impl<'a> std::iter::IntoIterator for &'a Token {
+    type Item = &'a Token;
+    type IntoIter = TokenIter<'a>;
+    fn into_iter(self) -> TokenIter<'a> {
+        TokenIter{token: self}
+    }
+}
+
+pub struct TokenIter<'a> {
     token: &'a Token,
 }
 
+// (a b c) -> a, b, c
 impl<'a> Iterator for TokenIter<'a> {
     type Item = &'a Token;
     fn next(&mut self) -> Option<&'a Token> {
