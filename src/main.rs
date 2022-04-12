@@ -1,5 +1,5 @@
-pub mod parse;
-pub mod token;
+mod parse;
+mod token;
 
 use std::io;
 
