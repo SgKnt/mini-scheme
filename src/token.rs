@@ -1,7 +1,7 @@
 use std::fmt;
 
 pub enum Token {
-    Int(i32),
+    Int(i64),
     Float(f64),
     Bool(bool),
     Id(String),

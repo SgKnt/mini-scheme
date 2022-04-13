@@ -195,7 +195,7 @@ mod tests {
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "23.4[float]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "-9.8[float]");
-        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err()), ("Some(read error: dot in wrong context)"));
+        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err().unwrap()), ("read error: dot in wrong context"));
     }
 
     #[test]
@@ -212,7 +212,7 @@ mod tests {
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), r#""hoge"[string]"#);
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), r#""fああueo84()79"[string]"#);
-        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err()), "Some(read error: unterminated string)");
+        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err().unwrap()), "read error: unterminated string");
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod tests {
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "#t[bool]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "#f[bool]");
-        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err()), "Some(read error: invalid symbol name)");
+        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err().unwrap()), "read error: invalid symbol name");
         assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().unwrap()), "#f[bool]");
         assert_eq!(format!("{:?}", tokens.get(4).unwrap().as_ref().unwrap()), "#t[bool]");
     }
@@ -232,8 +232,8 @@ mod tests {
         let tokens = lex.build_tokens();
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "hoge[id]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "fuga[id]");
-        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err()), "Some(read error: invalid symbol name)");
-        assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().err()), "Some(read error: invalid symbol name)");
+        assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err().unwrap()), "read error: invalid symbol name");
+        assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().err().unwrap()), "read error: invalid symbol name");
         assert_eq!(format!("{:?}", tokens.get(4).unwrap().as_ref().unwrap()), "piyo[id]");
     }
 
@@ -255,7 +255,7 @@ mod tests {
         assert_eq!(format!("{:?}", tokens1.get(0).unwrap().as_ref().unwrap()), "()");
         assert_eq!(format!("{:?}", tokens1.get(1).unwrap().as_ref().unwrap()), "(() ())");
         assert_eq!(format!("{:?}", tokens1.get(2).unwrap().as_ref().unwrap()), "(() ())");
-        assert_eq!(format!("{:?}", tokens1.get(3).unwrap().as_ref().err()), "Some(read error: extra close parenthesis)");
+        assert_eq!(format!("{:?}", tokens1.get(3).unwrap().as_ref().err().unwrap()), "read error: extra close parenthesis");
 
         let lex2 = Parser::new(r#"(define ls '(1 2 3 4))"#.to_string());
         let tokens2 = lex2.build_tokens();
