@@ -1,19 +1,26 @@
+use std::rc::{Rc, Weak};
+use std::cell::RefCell;
 
 pub struct Object {
-    
+    pub kind: ObjectKind
 }
 
 pub enum ObjectKind {
     Number(NumberKind),
     Boolean(bool),
     Pair{
-        car: Box<Object>,
-        cdr: Box<Object>
+        car: Ref,
+        cdr: Ref
     },
     Empty,
     Procedure(Procedure),
     Symbol(String),
     String(String),
+}
+
+pub enum Ref {
+    Rc(RefCell<Rc<Object>>),
+    Weak(RefCell<Weak<Object>>)
 }
 
 pub enum NumberKind {

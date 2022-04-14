@@ -1,7 +1,9 @@
 mod parse;
 mod token;
-//mod object;
-//mod env;
+mod object;
+mod val;
+mod env;
+mod eval;
 
 use std::io;
 

@@ -109,7 +109,7 @@ impl Parser {
             Err(anyhow!("read error: unterminated string"))
         } else {
             *cursor = end + 1;
-            Ok(Token::Str(self.input.get(start..end).unwrap().to_string()))
+            Ok(Token::String(self.input.get(start..end).unwrap().to_string()))
         }
     }
 
@@ -119,7 +119,7 @@ impl Parser {
         static RE_INT: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^\d+([\(\)'"\s]|$)"#).unwrap());
         static RE_BOOL: Lazy<Regex> = Lazy::new(|| Regex::new(r##"^#[ft]([\(\)'"#\s]|$)"##).unwrap());
         static RE_ID: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^[[:alnum:]!\$%&\*\+-\./<=>\?@\^_]+([\(\)'"\s]|$)"#).unwrap());
-        static RE_SEP: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[\(\)\s'"]"#).unwrap());
+        static RE_DELIMITER: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[\(\)\s'"]"#).unwrap());
 
         let input_from_cursor = self.input.split_at(*cursor).1;
         if RE_PERIOD.is_match(input_from_cursor) {
@@ -128,7 +128,7 @@ impl Parser {
         
         } else if let Some(mat) = RE_FLOAT.find(input_from_cursor) {
             let (start, mut end) = (*cursor, *cursor + mat.end() - 1);
-            if !RE_SEP.is_match_at(&self.input, end) {
+            if !RE_DELIMITER.is_match_at(&self.input, end) {
                 // match `$` (end)
                 end += 1;
             }
@@ -140,7 +140,7 @@ impl Parser {
 
         } else if let Some(mat) = RE_INT.find(input_from_cursor) {
             let (start, mut end) = (*cursor, *cursor + mat.end() - 1);
-            if !RE_SEP.is_match_at(&self.input, end) {
+            if !RE_DELIMITER.is_match_at(&self.input, end) {
                 end += 1;
             }
             *cursor = end;
@@ -153,21 +153,21 @@ impl Parser {
         } else if RE_BOOL.is_match(input_from_cursor) {
             *cursor += 2;
             if input_from_cursor.as_bytes()[1] == b'f' {
-                Ok(Token::Bool(false))
+                Ok(Token::Boolean(false))
             } else {
-                Ok(Token::Bool(true))
+                Ok(Token::Boolean(true))
             }
 
         } else if let Some(mat) = RE_ID.find(input_from_cursor) {
             let (start, mut end) = (*cursor, *cursor + mat.end() - 1);
-            if !RE_SEP.is_match_at(&self.input, end) {
+            if !RE_DELIMITER.is_match_at(&self.input, end) {
                 end += 1;
             }
             *cursor = end;
             Ok(Token::Id(self.input.get(start..end).unwrap().to_string()))
 
         } else {
-            *cursor = RE_SEP.find(input_from_cursor).map_or(self.input.len(), |m| *cursor + m.end());
+            *cursor = RE_DELIMITER.find(input_from_cursor).map_or(self.input.len(), |m| *cursor + m.end());
             Err(anyhow!("read error: invalid symbol name"))
         }
     }
@@ -219,11 +219,11 @@ mod tests {
     fn lex_bool() {
         let lex = Parser::new(r"#t #f #t42 #f#t".to_string());
         let tokens = lex.build_tokens();
-        assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "#t[bool]");
-        assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "#f[bool]");
+        assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "#t[boolean]");
+        assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "#f[boolean]");
         assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().err().unwrap()), "read error: invalid symbol name");
-        assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().unwrap()), "#f[bool]");
-        assert_eq!(format!("{:?}", tokens.get(4).unwrap().as_ref().unwrap()), "#t[bool]");
+        assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().unwrap()), "#f[boolean]");
+        assert_eq!(format!("{:?}", tokens.get(4).unwrap().as_ref().unwrap()), "#t[boolean]");
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(format!("{:?}", tokens.get(0).unwrap().as_ref().unwrap()), "'123[int]");
         assert_eq!(format!("{:?}", tokens.get(1).unwrap().as_ref().unwrap()), "'0.00123[float]");
         assert_eq!(format!("{:?}", tokens.get(2).unwrap().as_ref().unwrap()), "'\"foo\"[string]");
-        assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().unwrap()), "'#t[bool]");
+        assert_eq!(format!("{:?}", tokens.get(3).unwrap().as_ref().unwrap()), "'#t[boolean]");
         assert_eq!(format!("{:?}", tokens.get(4).unwrap().as_ref().unwrap()), "'''bar[id]");
     }
 
