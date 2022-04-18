@@ -7,11 +7,11 @@ use super::object::*;
 use super::token::*;
 use super::env::*;
 
-pub fn eval(token: &Token, env: &Environment) -> Result<Object> {
+pub fn eval(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Object> {
     todo!()
 }
 
-fn eval_exp(token: &Token, env: &Environment) -> Result<Rc<Object>> {
+fn eval_exp(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>> {
     match token {
         &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
         &Token::Float(f) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))})),
@@ -19,14 +19,14 @@ fn eval_exp(token: &Token, env: &Environment) -> Result<Rc<Object>> {
         Token::String(s) => Ok(Rc::new(Object{kind: ObjectKind::String(s.clone())})),
         &Token::Empty => Ok(Rc::new(Object{kind: ObjectKind::Empty})),
         Token::Symbol(s) => eval_quote(&*s, env),
-        Token::Id(id) => if let Some(var) = env.variables.borrow().get(id) {
+        Token::Id(id) => if let Some(var) = env.borrow().variables.borrow().get(id) {
             Ok(Rc::clone(&var.value.borrow()))
         } else {
             Err(anyhow!("unbound variable: {}", id))
         },
         Token::Pair{car, cdr} => match &**car {
             Token::Id(id) => {
-                if env.variables.borrow().get(id).is_some() {
+                if env.borrow().variables.borrow().get(id).is_some() {
                     eval_app(car, cdr, env)
                 } else {
                     match id.as_str() {
@@ -80,7 +80,7 @@ fn eval_exp(token: &Token, env: &Environment) -> Result<Rc<Object>> {
     }
 }
 
-fn eval_quote(token: &Token, env: &Environment) -> Result<Rc<Object>> {
+fn eval_quote(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>> {
     // the token must be the elements of Token::Symbol
     match token {
         &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
@@ -97,6 +97,6 @@ fn eval_quote(token: &Token, env: &Environment) -> Result<Rc<Object>> {
     }
 }
 
-fn eval_app(proc: &Token, args: &Token, env: &Environment) -> Result<Rc<Object>> {
+fn eval_app(proc: &Token, args: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>> {
     todo!()
 }
