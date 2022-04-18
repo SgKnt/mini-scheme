@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use super::object::{Object};
 
-pub struct Variable {
+struct Variable {
     pub id: String,
     pub value: RefCell<Rc<Object>>
 }

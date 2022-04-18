@@ -1,7 +1,7 @@
 mod parse;
 mod token;
 mod object;
-mod val;
+//mod val;
 mod env;
 mod eval;
 

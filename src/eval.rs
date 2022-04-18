@@ -19,8 +19,8 @@ fn eval_exp(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>>
         Token::String(s) => Ok(Rc::new(Object{kind: ObjectKind::String(s.clone())})),
         &Token::Empty => Ok(Rc::new(Object{kind: ObjectKind::Empty})),
         Token::Symbol(s) => eval_quote(&*s, env),
-        Token::Id(id) => if let Some(var) = env.borrow().variables.borrow().get(id) {
-            Ok(Rc::clone(&var.value.borrow()))
+        Token::Id(id) => if let Some(var) = env.borrow().lookup(id) {
+            Ok(Rc::clone(&var))
         } else {
             Err(anyhow!("unbound variable: {}", id))
         },
