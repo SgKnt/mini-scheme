@@ -11,14 +11,14 @@ pub fn eval(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Object> {
     todo!()
 }
 
-fn eval_exp(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>> {
+fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     match token {
         &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
         &Token::Float(f) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))})),
         &Token::Boolean(b) => Ok(Rc::new(Object{kind: ObjectKind::Boolean(b)})),
         Token::String(s) => Ok(Rc::new(Object{kind: ObjectKind::String(s.clone())})),
         &Token::Empty => Ok(Rc::new(Object{kind: ObjectKind::Empty})),
-        Token::Symbol(s) => eval_quote(&*s, env),
+        Token::Symbol(s) => eval_quote(&*s),
         Token::Id(id) => if let Some(var) = env.borrow().lookup(id) {
             Ok(Rc::clone(&var))
         } else {
@@ -26,15 +26,21 @@ fn eval_exp(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>>
         },
         Token::Pair{car, cdr} => match &**car {
             Token::Id(id) => {
-                if env.borrow().variables.borrow().get(id).is_some() {
+                if env.variables.borrow().get(id).is_some() {
                     eval_app(car, cdr, env)
                 } else {
                     match id.as_str() {
+                        "define" => {
+                            let second_elem = cdr.elem().with_context(|| format!("syntax error: {}", token))?;
+                            if let Token::Id(id) = second_elem {
+                                env.variables.get_mut()
+                            }
+                        }
                         "lambda" => {
                             todo!()
                         },
                         "quote" => {
-                            eval_quote(cdr, env)
+                            eval_quote(cdr)
                         },
                         "set!" => {
                             todo!()
@@ -80,7 +86,7 @@ fn eval_exp(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>>
     }
 }
 
-fn eval_quote(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>> {
+fn eval_quote(token: &Token) -> Result<Rc<Object>> {
     // the token must be the elements of Token::Symbol
     match token {
         &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
@@ -91,8 +97,8 @@ fn eval_quote(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object
         Token::Symbol(_) => Ok(Rc::new(Object{kind: ObjectKind::Symbol(format!("{}", token))})),
         Token::Id(id) => Ok(Rc::new(Object{kind: ObjectKind::Symbol(format!("{}", id))})),
         Token::Pair{car, cdr} => Ok(Rc::new(Object{kind: ObjectKind::Pair{
-            car: Ref::Rc(RefCell::new(eval_quote(&**car, env)?)), 
-            cdr: Ref::Rc(RefCell::new(eval_quote(&**cdr, env)?))
+            car: Ref::Rc(RefCell::new(eval_quote(&**car)?)), 
+            cdr: Ref::Rc(RefCell::new(eval_quote(&**cdr)?))
         }})),
     }
 }
