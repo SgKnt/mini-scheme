@@ -88,10 +88,10 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                 bail!("syntax error: at least one clause is required for cond: {}", token);
                             }
 
-                            let mut clause = &**cdr;
                             let mut res = Err(anyhow!("interpreter error at {}", line!()));
-                            while !clause.is_empty() {
-                                if let Token::Pair{car: test, cdr: exps} = clause.elem().unwrap() {
+                            for clause in &**cdr {
+                                if let Token::Pair{car: test, cdr: exps} = clause.elem()
+                                        .with_context(|| format!("syntax error: bad clause in cond: {}", token))? {
                                     if exps.is_empty() || !exps.is_list() {
                                         bail!("syntax error: bad clause in cond: {}", token);
                                     } else {
@@ -107,14 +107,11 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                                         res = Ok(eval_exp(exp, env)?);
                                                     }
                                                 } else {
-                                                    clause = clause.next().unwrap();
                                                     continue;
                                                 }
                                             }
                                         }
                                     }
-                                } else {
-                                    bail!("syntax error: bad clause in cond: {}", token);
                                 }
                             }
                             res
