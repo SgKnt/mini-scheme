@@ -8,6 +8,7 @@ use super::token::*;
 use super::env::*;
 
 pub fn eval(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Object> {
+    // Exp, Define, (load String)
     todo!()
 }
 
@@ -19,7 +20,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
         Token::String(s) => Ok(Rc::new(Object{kind: ObjectKind::String(s.clone())})),
         &Token::Empty => Ok(Rc::new(Object{kind: ObjectKind::Empty})),
         Token::Symbol(s) => eval_quote(&*s),
-        Token::Id(id) => if let Some(var) = env.borrow().lookup(id) {
+        Token::Id(id) => if let Some(var) = env.lookup(id) {
             Ok(Rc::clone(&var))
         } else {
             Err(anyhow!("unbound variable: {}", id))
@@ -30,12 +31,6 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                     eval_app(car, cdr, env)
                 } else {
                     match id.as_str() {
-                        "define" => {
-                            let second_elem = cdr.elem().with_context(|| format!("syntax error: {}", token))?;
-                            if let Token::Id(id) = second_elem {
-                                env.variables.get_mut()
-                            }
-                        }
                         "lambda" => {
                             todo!()
                         },
@@ -55,10 +50,74 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             todo!()
                         }
                         "if" => {
-                            todo!()
+                            // (if exp1 exp2 exp3)
+                            let exp1 = cdr.elem()
+                                .with_context(|| format!("error: proper list required for function application or macro use: {}", token))?;
+                            let exp2 = cdr.next()
+                                .map(|t| t.elem().with_context(|| format!("syntax error: malformed if: {}", token))) // (if foo)
+                                .with_context(|| format!("error: proper list required for function application or macro use: {}", token))??; // (if foo . bar)
+                            let exp3 = cdr.next().unwrap();
+                            let cond = eval_exp(exp1, env)?;
+                            match exp3 {
+                                Token::Pair{car: exp3_car, cdr: exp3_cdr} => {
+                                    if !exp3_cdr.is_empty() {
+                                        Err(anyhow!("syntax error: malformed if: {}", token))
+                                    } else if !cond.is_falsy() {
+                                        eval_exp(exp2, env)
+                                    } else {
+                                        eval_exp(exp3_car, env)
+                                    }
+                                }
+                                Token::Empty => {
+                                    if !cond.is_falsy() {
+                                        eval_exp(exp2, env)
+                                    } else {
+                                        Ok(Rc::new(Object{kind: ObjectKind::Undefined}))
+                                    }
+                                }
+                                _ => {
+                                    Err(anyhow!("error: proper list required for function application or macro use: {}", token))
+                                }
+                            }
                         }
                         "cond" => {
-                            todo!()
+                            if !cdr.is_list() {
+                                bail!("error: proper list required for function application or macro use: {}", token);
+                            }
+                            if cdr.is_empty() {
+                                bail!("syntax error: at least one clause is required for cond: {}", token);
+                            }
+
+                            let mut clause = &**cdr;
+                            let mut res = Err(anyhow!("interpreter error at {}", line!()));
+                            while !clause.is_empty() {
+                                if let Token::Pair{car: test, cdr: exps} = clause.elem().unwrap() {
+                                    if exps.is_empty() || !exps.is_list() {
+                                        bail!("syntax error: bad clause in cond: {}", token);
+                                    } else {
+                                        match &**test {
+                                            Token::Id(s) if &*s == "else" => {
+                                                for exp in &**exps {
+                                                    res = Ok(eval_exp(exp, env)?);
+                                                }
+                                            }
+                                            _ => {
+                                                if !eval_exp(test, env)?.is_falsy() {
+                                                    for exp in &**exps {
+                                                        res = Ok(eval_exp(exp, env)?);
+                                                    }
+                                                } else {
+                                                    clause = clause.next().unwrap();
+                                                    continue;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    bail!("syntax error: bad clause in cond: {}", token);
+                                }
+                            }
+                            res
                         }
                         "and" => {
                             todo!()
@@ -103,6 +162,6 @@ fn eval_quote(token: &Token) -> Result<Rc<Object>> {
     }
 }
 
-fn eval_app(proc: &Token, args: &Token, env: &RefCell<Rc<Environment>>) -> Result<Rc<Object>> {
+fn eval_app(proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     todo!()
 }

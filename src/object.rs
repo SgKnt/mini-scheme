@@ -18,6 +18,17 @@ pub enum ObjectKind {
     Procedure(Procedure),
     Symbol(String),
     String(String),
+    Undefined,
+}
+
+impl Object {
+    pub fn is_falsy(&self) -> bool {
+        if let ObjectKind::Boolean(false) = self.kind {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 pub enum Ref {

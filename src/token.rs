@@ -14,22 +14,47 @@ pub enum Token {
 impl Token {
     // (a ..) -> a
     pub fn elem(&self) -> Option<&Self> {
-        match &self {
-            Token::Pair{car, ..} => Some(car.as_ref()),
+        match self {
+            Token::Pair{car, ..} => Some(&**car),
             _ => None,
         }
     }
 
     // (a ..) -> ..
     pub fn next(&self) -> Option<&Self> {
-        if let Token::Pair{car: _, cdr} = &self {
-            if let Token::Pair{..} = &**cdr {
-                Some(cdr)
-            } else {
-                None
-            }
+        if let Token::Pair{car: _, cdr} = self {
+            match &**cdr {
+                Token::Pair{..} | Token::Empty => Some(cdr),
+                _ => None
+            } 
         } else {
             None
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        if let Token::Empty = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        let mut t = self;
+        loop {
+            match t {
+                Token::Pair{car: _, cdr} => {
+                    t = &&*cdr;
+                    continue;
+                }
+                Token::Empty => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            }
         }
     }
 }

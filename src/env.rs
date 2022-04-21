@@ -12,7 +12,7 @@ pub struct Environment {
 impl Environment {
     pub fn new_global() -> Self {
         Environment{
-            variables: RefCell::New(HashMap::new()),
+            variables: RefCell::new(HashMap::new()),
             parent: None
         }
     }
@@ -27,7 +27,7 @@ impl Environment {
     pub fn lookup(&self, key: &str) -> Option<Rc<Object>> {
         if let Some(v) = self.variables.borrow().get(key) {
             Some(Rc::clone(&*v.borrow()))
-        } else if let Some(p) = self.parent {
+        } else if let Some(p) = &self.parent {
             p.borrow().lookup(key)
         } else {
             None
