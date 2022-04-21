@@ -81,9 +81,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             }
                         }
                         "cond" => {
-                            if !cdr.is_list() {
-                                bail!("error: proper list required for function application or macro use: {}", token);
-                            }
+                            assert_proper_list(cdr)?;
                             if cdr.is_empty() {
                                 bail!("syntax error: at least one clause is required for cond: {}", token);
                             }
@@ -96,7 +94,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                         bail!("syntax error: bad clause in cond: {}", token);
                                     } else {
                                         match &**test {
-                                            Token::Id(s) if &*s == "else" => {
+                                            Token::Id(s) if s == "else" => {
                                                 for exp in &**exps {
                                                     res = Ok(eval_exp(exp, env)?);
                                                 }
@@ -117,16 +115,87 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             res
                         }
                         "and" => {
-                            todo!()
+                            assert_proper_list(cdr)?;
+                            let mut res = Rc::new(Object{kind: ObjectKind::Boolean(true)});
+                            for test in &**cdr {
+                                res = eval_exp(test, env)?;
+                                if res.is_falsy() {
+                                    break;
+                                }
+                            }
+                            Ok(res)
                         }
                         "or" => {
-                            todo!()
+                            assert_proper_list(cdr)?;
+                            let mut res = Rc::new(Object{kind: ObjectKind::Boolean(false)});
+                            for test in &**cdr {
+                                res = eval_exp(test, env)?;
+                                if !res.is_falsy() {
+                                    break;
+                                }
+                            }
+                            Ok(res)
                         }
                         "begin" => {
-                            todo!()
+                            assert_proper_list(cdr)?;
+                            let mut res = Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(0))});
+                            for exp in &**cdr {
+                                res = eval_exp(exp, env)?;
+                            }
+                            Ok(res)
                         }
                         "do" => {
-                            todo!()
+                            // (do (val_init_steps) (test exps) body)
+                            assert_proper_list(cdr)?;
+                            let do_env = Rc::new(Environment::new(env));
+
+                            let val_init_steps = cdr.elem().with_context(|| format!("syntax error: malformed do: {}", token))?;
+                            if !val_init_steps.is_list() {
+                                bail!("syntax error: malformed do: {}", token);
+                            }
+                            let mut vals: Vec<&str> = Vec::new();
+                            let mut steps: Vec<&Token> = Vec::new();
+                            for val_init_step in val_init_steps {
+                                let val = val_init_step.nth(0).with_context(|| format!("syntax error: malformed do: {}", token))?;
+                                let init = val_init_step.nth(1).with_context(|| format!("syntax error: malformed do: {}", token))?;
+                                let step = val_init_step.nth(2).with_context(|| format!("syntax error: malformed do: {}", token))?;
+                                if let Token::Id(id) = val {
+                                    vals.push(id.as_ref());
+                                    do_env.variables.borrow_mut().insert(id.clone(), RefCell::new(eval_exp(init, env)?));
+                                } else {
+                                    bail!("syntax error: malformed do: {}", token);
+                                }
+                                steps.push(step);
+                                if let None = val_init_step.nth(3) {
+                                    bail!("syntax error: malformed do: {}", token);
+                                }
+                            }
+
+                            let test_exp = cdr
+                                .next()
+                                .with_context(|| format!("syntax error: malformed do: {}", token))?
+                                .elem()
+                                .with_context(|| format!("syntax error: malformed do: {}", token))?;
+                            if !test_exp.is_list() {
+                                bail!("syntax error: malformed do: {}", token);
+                            }
+                            let test = test_exp.elem().with_context(|| format!("syntax error: malformed do: {}", token))?;
+
+                            let cmds = cdr
+                                .next()
+                                .unwrap()
+                                .next()
+                                .with_context(|| format!("syntax error: malformed do: {}", token))?;
+                            
+                            while !eval_exp(test, &do_env)?.is_falsy() {
+                                eval_body(cmds, &do_env)?;
+                            }
+
+                            let mut res = Rc::new(Object{kind: ObjectKind::Boolean(true)});
+                            for exp in test_exp.next() {
+                                res = eval_exp(exp, &do_env)?;
+                            }
+                            Ok(res)
                         }
                         _ => Err(anyhow!("unbound variable: {}", id))
                     }
@@ -143,7 +212,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
 }
 
 fn eval_quote(token: &Token) -> Result<Rc<Object>> {
-    // the token must be the elements of Token::Symbol
+    // "token" must be elements of Token::Symbol
     match token {
         &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
         &Token::Float(f) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))})),
@@ -161,4 +230,16 @@ fn eval_quote(token: &Token) -> Result<Rc<Object>> {
 
 fn eval_app(proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     todo!()
+}
+
+fn eval_body(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+    todo!()
+}
+
+fn assert_proper_list(token: &Token) -> Result<()> {
+    if !token.is_list() {
+        Err(anyhow!("proper list required for function application or macro use: {}", token))
+    } else {
+        Ok(())
+    }
 }

@@ -32,6 +32,18 @@ impl Token {
         }
     }
 
+    pub fn nth(&self, n: usize) -> Option<&Self> {
+        let mut t = self;
+        for _ in 0..n {
+            if let Token::Pair{car: _, cdr} = t {
+                t = &**cdr;
+            } else {
+                return None;
+            }
+        }
+        t.elem()
+    }
+
     pub fn is_empty(&self) -> bool {
         if let Token::Empty = self {
             true
@@ -129,5 +141,34 @@ impl<'a> Iterator for TokenIter<'a> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn nth_test1() {
+        let t = Token::Pair{
+            car: Box::new(Token::Int(0)),
+            cdr: Box::new(Token::Pair { 
+                car: Box::new(Token::Boolean(false)), 
+                cdr: Box::new(Token::Empty)
+            })
+        };
+        assert_eq!(format!("{}", t.nth(0).unwrap()), "0");
+        assert_eq!(format!("{}", t.nth(1).unwrap()), "#f");
+    }
+    #[test]
+    #[should_panic]
+    fn nth_test2() {
+        let t = Token::Pair{
+            car: Box::new(Token::Int(0)),
+            cdr: Box::new(Token::Pair { 
+                car: Box::new(Token::Boolean(false)), 
+                cdr: Box::new(Token::Empty)
+            })
+        };
+        t.nth(2).unwrap();
     }
 }
