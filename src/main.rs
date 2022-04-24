@@ -5,12 +5,17 @@ mod object;
 mod env;
 mod eval;
 
-use std::io;
+use std::io::{self, Write};
+use std::rc::Rc;
 
+use env::Environment;
+use eval::eval;
 use parse::Parser;
 
 fn read_stdin() -> io::Result<String> {
     let mut buf = String::new();
+    print!("mini$ ");
+    io::stdout().flush()?;
     loop {
         io::stdin().read_line(&mut buf)?;
 
@@ -18,6 +23,8 @@ fn read_stdin() -> io::Result<String> {
         if has_read {
             break;
         }
+        print!("..... ");
+        io::stdout().flush()?;
     }
     Ok(buf)
 }
@@ -48,13 +55,25 @@ fn in_unterminated_paren_or_string(buf: &str) -> bool {
 }
 
 fn main() {
-    let input = read_stdin().unwrap();
-    let lex = Parser::new(input);
-    let tokens = lex.build_tokens();
-    for token in tokens {
-        match token {
-            Ok(token) => println!("{:?}", token),
-            Err(err) => println!("{:?}", err),
+    let global_env = Rc::new(Environment::new_global());
+    loop {
+        let input = read_stdin().unwrap();
+        if input.len() == 0 {
+            break;
+        }
+        let lex = Parser::new(input);
+        let tokens = lex.build_tokens();
+        for token in &tokens {
+            match token {
+                Ok(token) => {
+                    let res = eval(token, &global_env);
+                    match res {
+                        Ok(obj) => println!("{}", obj),
+                        Err(err) => println!("{:?}", err),
+                    }
+                }
+                Err(err) => println!("{:?}", err),
+            }
         }
     }
 }

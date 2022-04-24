@@ -79,7 +79,7 @@ impl fmt::Display for Token {
             Token::Boolean(b) if *b => write!(f, "#t"),
             Token::Boolean(_) => write!(f, "#f"), 
             Token::Id(id) => write!(f, "{}", id),
-            Token::String(s) => write!(f, "{}", s),
+            Token::String(s) => write!(f, "\"{}\"", s),
             Token::Pair{car, cdr} => match **cdr {
                 Token::Pair{..} => {
                     let cdr = format!("{}", cdr);

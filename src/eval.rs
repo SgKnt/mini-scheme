@@ -7,8 +7,45 @@ use super::object::*;
 use super::token::*;
 use super::env::*;
 
-pub fn eval(token: &Token, env: &RefCell<Rc<Environment>>) -> Result<Object> {
+pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     // Exp, Define, (load String)
+    match token {
+        Token::Pair{car, cdr} => match &**car {
+            Token::Id(id) if id == "define" => {
+                eval_define(&**cdr, env)
+            }
+            Token::Id(id) if id == "load" => {
+                eval_load(&**cdr, env)
+            }
+            _ => eval_exp(token, env)
+        }
+        _ => eval_exp(token, env)
+    }
+}
+
+pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+    // `token` is next token of "define"
+    ensure_proper_list(token)?;
+    let ids = token.elem().with_context(|| format!("syntax error: {}", token))?;
+    match ids {
+        Token::Id(id) => {
+            let obj = token
+                .next()
+                .unwrap()
+                .elem()
+                .map(|t| eval_exp(t, env))
+                .unwrap_or_else(|| Ok(Rc::new(Object{kind: ObjectKind::Undefined})))?;
+            env.variables.borrow_mut().insert(id.clone(), RefCell::new(obj));
+            Ok(Rc::new(Object{kind: ObjectKind::Symbol(id.clone())}))
+        }
+        Token::Pair{car: id, cdr: args} => {
+            todo!()
+        }
+        _ => Err(anyhow!("syntax error: {}", token))
+    }
+}
+
+pub fn eval_load(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     todo!()
 }
 
@@ -54,9 +91,13 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             let exp1 = cdr.elem()
                                 .with_context(|| format!("error: proper list required for function application or macro use: {}", token))?;
                             let exp2 = cdr.next()
-                                .map(|t| t.elem().with_context(|| format!("syntax error: malformed if: {}", token))) // (if foo)
-                                .with_context(|| format!("error: proper list required for function application or macro use: {}", token))??; // (if foo . bar)
-                            let exp3 = cdr.next().unwrap();
+                                .with_context(|| format!("error: proper list required for function application or macro use: {}", token))?
+                                .elem()
+                                .with_context(|| format!("syntax error: malformed if: {}", token))?;
+                            let exp3 = cdr.next()
+                                .unwrap()
+                                .next()
+                                .with_context(|| format!("error: proper list required for function application or macro use: {}", token))?;
                             let cond = eval_exp(exp1, env)?;
                             match exp3 {
                                 Token::Pair{car: exp3_car, cdr: exp3_cdr} => {
@@ -81,15 +122,15 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             }
                         }
                         "cond" => {
-                            assert_proper_list(cdr)?;
+                            ensure_proper_list(cdr)?;
                             if cdr.is_empty() {
                                 bail!("syntax error: at least one clause is required for cond: {}", token);
                             }
 
-                            let mut res = Err(anyhow!("interpreter error at {}", line!()));
+                            let mut res = Ok(Rc::new(Object{kind: ObjectKind::Undefined}));
                             for clause in &**cdr {
-                                if let Token::Pair{car: test, cdr: exps} = clause.elem()
-                                        .with_context(|| format!("syntax error: bad clause in cond: {}", token))? {
+                                println!("debug: clause = {}", clause);
+                                if let Token::Pair{car: test, cdr: exps} = clause {
                                     if exps.is_empty() || !exps.is_list() {
                                         bail!("syntax error: bad clause in cond: {}", token);
                                     } else {
@@ -110,12 +151,14 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                             }
                                         }
                                     }
+                                } else {
+                                    bail!("syntax error: bad clause in cond: {}", token);
                                 }
                             }
                             res
                         }
                         "and" => {
-                            assert_proper_list(cdr)?;
+                            ensure_proper_list(cdr)?;
                             let mut res = Rc::new(Object{kind: ObjectKind::Boolean(true)});
                             for test in &**cdr {
                                 res = eval_exp(test, env)?;
@@ -126,7 +169,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             Ok(res)
                         }
                         "or" => {
-                            assert_proper_list(cdr)?;
+                            ensure_proper_list(cdr)?;
                             let mut res = Rc::new(Object{kind: ObjectKind::Boolean(false)});
                             for test in &**cdr {
                                 res = eval_exp(test, env)?;
@@ -137,7 +180,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             Ok(res)
                         }
                         "begin" => {
-                            assert_proper_list(cdr)?;
+                            ensure_proper_list(cdr)?;
                             let mut res = Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(0))});
                             for exp in &**cdr {
                                 res = eval_exp(exp, env)?;
@@ -146,7 +189,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                         }
                         "do" => {
                             // (do (val_init_steps) (test exps) body)
-                            assert_proper_list(cdr)?;
+                            ensure_proper_list(cdr)?;
                             let do_env = Rc::new(Environment::new(env));
 
                             let val_init_steps = cdr.elem().with_context(|| format!("syntax error: malformed do: {}", token))?;
@@ -232,11 +275,15 @@ fn eval_app(proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Obje
     todo!()
 }
 
+fn eval_lambda(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+    todo!()
+}
+
 fn eval_body(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     todo!()
 }
 
-fn assert_proper_list(token: &Token) -> Result<()> {
+fn ensure_proper_list(token: &Token) -> Result<()> {
     if !token.is_list() {
         Err(anyhow!("proper list required for function application or macro use: {}", token))
     } else {
