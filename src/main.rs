@@ -14,7 +14,7 @@ use parse::Parser;
 
 fn read_stdin() -> io::Result<String> {
     let mut buf = String::new();
-    print!("mini$ ");
+    print!(">>> ");
     io::stdout().flush()?;
     loop {
         io::stdin().read_line(&mut buf)?;
@@ -23,7 +23,7 @@ fn read_stdin() -> io::Result<String> {
         if has_read {
             break;
         }
-        print!("..... ");
+        print!("... ");
         io::stdout().flush()?;
     }
     Ok(buf)
