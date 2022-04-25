@@ -12,7 +12,7 @@ pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     match token {
         Token::Pair{car, cdr} => match &**car {
             Token::Id(id) if id == "define" => {
-                eval_define(&**cdr, env)
+                eval_define(token, env)
             }
             Token::Id(id) if id == "load" => {
                 eval_load(&**cdr, env)
@@ -24,9 +24,11 @@ pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
 }
 
 pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
-    // `token` is next token of "define"
+    let def_token = token;
+    let token = token.next().unwrap();
     ensure_proper_list(token)?;
-    let ids = token.elem().with_context(|| format!("syntax error: {}", token))?;
+
+    let ids = token.elem().with_context(|| format!("syntax error: {}", def_token))?;
     match ids {
         Token::Id(id) => {
             let obj = token
@@ -39,9 +41,16 @@ pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
             Ok(Rc::new(Object{kind: ObjectKind::Symbol(id.clone())}))
         }
         Token::Pair{car: id, cdr: args} => {
-            todo!()
+            if let Token::Id(id) = &**id {
+                let body = token.next().unwrap();
+                let obj = eval_lambda(args, body, env)?;
+                env.variables.borrow_mut().insert(id.clone(), RefCell::new(obj));
+                Ok(Rc::new(Object{kind: ObjectKind::Symbol(id.clone())}))
+            } else {
+                Err(anyhow!("syntax error: {}", def_token))
+            }
         }
-        _ => Err(anyhow!("syntax error: {}", token))
+        _ => Err(anyhow!("syntax error: {}", def_token))
     }
 }
 
@@ -275,7 +284,7 @@ fn eval_app(proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Obje
     todo!()
 }
 
-fn eval_lambda(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+fn eval_lambda(arg: &Token, body: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     todo!()
 }
 

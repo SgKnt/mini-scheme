@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::fmt;
@@ -58,7 +56,7 @@ impl fmt::Display for Object {
                     Ref::Rc(cdr) => match cdr.borrow().kind {
                         ObjectKind::Pair{..} => {
                             let cdr = format!("{}", cdr.borrow());
-                            write!(f, "({} {}", car.borrow(), cdr)
+                            write!(f, "({} {}", car.borrow(), cdr.split_at(1).1)
                         }
                         ObjectKind::Empty => write!(f, "({})", car.borrow()),
                         _ => write!(f, "({} {})", car.borrow(), cdr.borrow())
@@ -66,7 +64,7 @@ impl fmt::Display for Object {
                     Ref::Weak(cdr) => match cdr.borrow().upgrade().unwrap().kind {
                         ObjectKind::Pair{..} => {
                             let cdr = format!("{}", cdr.borrow().upgrade().unwrap());
-                            write!(f, "({} {}", car.borrow(), cdr)
+                            write!(f, "({} {}", car.borrow(), cdr.split_at(1).1)
                         }
                         ObjectKind::Empty => write!(f, "({})", car.borrow()),
                         _ => write!(f, "({} {})", car.borrow(), cdr.borrow().upgrade().unwrap())
@@ -76,7 +74,7 @@ impl fmt::Display for Object {
                     Ref::Rc(cdr) => match cdr.borrow().kind {
                         ObjectKind::Pair{..} => {
                             let cdr = format!("{}", cdr.borrow());
-                            write!(f, "({} {}", car.borrow().upgrade().unwrap(), cdr)
+                            write!(f, "({} {}", car.borrow().upgrade().unwrap(), cdr.split_at(1).1)
                         }
                         ObjectKind::Empty => write!(f, "({})", car.borrow().upgrade().unwrap()),
                         _ => write!(f, "({} {})", car.borrow().upgrade().unwrap(), cdr.borrow())
@@ -84,7 +82,7 @@ impl fmt::Display for Object {
                     Ref::Weak(cdr) => match cdr.borrow().upgrade().unwrap().kind {
                         ObjectKind::Pair{..} => {
                             let cdr = format!("{}", cdr.borrow().upgrade().unwrap());
-                            write!(f, "({} {}", car.borrow().upgrade().unwrap(), cdr)
+                            write!(f, "({} {}", car.borrow().upgrade().unwrap(), cdr.split_at(1).1)
                         }
                         ObjectKind::Empty => write!(f, "({})", car.borrow().upgrade().unwrap()),
                         _ => write!(f, "({} {})", car.borrow().upgrade().unwrap(), cdr.borrow().upgrade().unwrap())
