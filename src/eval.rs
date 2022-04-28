@@ -43,7 +43,7 @@ pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
         Token::Pair{car: id, cdr: args} => {
             if let Token::Id(id) = &**id {
                 let body = token.next().unwrap();
-                let obj = eval_lambda(args, body, env)?;
+                let obj = eval_lambda(token, args, body, env)?;
                 env.variables.borrow_mut().insert(id.clone(), RefCell::new(obj));
                 Ok(Rc::new(Object{kind: ObjectKind::Symbol(id.clone())}))
             } else {
@@ -74,11 +74,14 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
         Token::Pair{car, cdr} => match &**car {
             Token::Id(id) => {
                 if env.variables.borrow().get(id).is_some() {
-                    eval_app(car, cdr, env)
+                    eval_app(token, car, cdr, env)
                 } else {
                     match id.as_str() {
                         "lambda" => {
-                            todo!()
+                            ensure_proper_list(cdr)?;
+                            let arg = cdr.elem().with_context(|| format!("syntax error: malformed lambda: {}", token))?;
+                            let body = cdr.next().unwrap();
+                            eval_lambda(token, arg, body, env)
                         },
                         "quote" => {
                             eval_quote(cdr)
@@ -254,7 +257,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                 }
             }, 
             Token::Pair{..} => {
-                eval_app(car, cdr, env)
+                eval_app(token, car, cdr, env)
             }
             _ => {
                 Err(anyhow!("invalid application: {}", token))
@@ -280,12 +283,30 @@ fn eval_quote(token: &Token) -> Result<Rc<Object>> {
     }
 }
 
-fn eval_app(proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     todo!()
 }
 
-fn eval_lambda(arg: &Token, body: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
-    todo!()
+fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+    let mut args = Vec::new();
+    while let Some(id) = arg.elem() {
+        match id {
+            Token::Id(id) => args.push(id.clone()),
+            _ => bail!("syntax error: argment must be identifier: {}", token),
+        }
+        arg = arg.cdr().unwrap();
+    }
+    let required = args.len() as u32;
+    match arg {
+        Token::Id(id) => {
+            args.push(id.clone());
+            Ok(Rc::new(Object{kind: ObjectKind::Procedure(Procedure{env: Rc::clone(env), args: Args{ids: args, is_variadic: true, required}, body: body.clone()})}))
+        }
+        Token::Empty => {
+            Ok(Rc::new(Object{kind: ObjectKind::Procedure(Procedure{env: Rc::clone(env), args: Args{ids: args, is_variadic: false, required}, body: body.clone()})}))
+        }
+        _ => Err(anyhow!("syntax error: argment must be identifier: {}", token))
+    }
 }
 
 fn eval_body(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {

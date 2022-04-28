@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::fmt;
 
 use crate::env::Environment;
+use crate::token::Token;
 
 pub struct Object {
     pub kind: ObjectKind
@@ -105,5 +106,13 @@ pub enum NumberKind {
 }
 
 pub struct Procedure {
-    pub env: RefCell<Rc<Environment>>
+    pub env: Rc<Environment>,
+    pub args: Args,
+    pub body: Token
+}
+
+pub struct Args {
+    pub ids: Vec<String>,
+    pub is_variadic: bool,
+    pub required: u32,
 }

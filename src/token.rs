@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[derive(Clone)]
 pub enum Token {
     Int(i64),
     Float(f64),
@@ -12,12 +13,22 @@ pub enum Token {
 }
 
 impl Token {
-    // (a ..) -> a
-    pub fn elem(&self) -> Option<&Self> {
+    pub fn car(&self) -> Option<&Self> {
         match self {
             Token::Pair{car, ..} => Some(&**car),
             _ => None,
         }
+    }
+
+    pub fn cdr(&self) -> Option<&Self> {
+        match self {
+            Token::Pair{car: _, cdr} => Some(cdr),
+            _ => None,
+        }
+    }
+    // (a ..) -> a
+    pub fn elem(&self) -> Option<&Self> {
+        self.car()
     }
 
     // (a ..) -> ..
@@ -57,7 +68,7 @@ impl Token {
         loop {
             match t {
                 Token::Pair{car: _, cdr} => {
-                    t = &&*cdr;
+                    t = &**cdr;
                     continue;
                 }
                 Token::Empty => {

@@ -19,7 +19,7 @@ fn read_stdin() -> io::Result<String> {
     loop {
         io::stdin().read_line(&mut buf)?;
 
-        let has_read = !in_unterminated_paren_or_string(&buf);
+        let has_read = !at_unterminated_paren_or_string(&buf);
         if has_read {
             break;
         }
@@ -29,7 +29,7 @@ fn read_stdin() -> io::Result<String> {
     Ok(buf)
 }
 
-fn in_unterminated_paren_or_string(buf: &str) -> bool {
+fn at_unterminated_paren_or_string(buf: &str) -> bool {
     let mut nest = 0;           // the number of layers of nesting ()
     let mut in_str = false;    // between " " ?
 
