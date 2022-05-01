@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -284,7 +285,41 @@ fn eval_quote(token: &Token) -> Result<Rc<Object>> {
 }
 
 fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
-    todo!()
+    // argument "token" is for error messages
+    ensure_proper_list(args)?;
+    let proc = eval_exp(proc, env)?;
+    let mut args: VecDeque<Result<Rc<Object>>> = args
+        .into_iter()
+        .map(|t| -> Result<Rc<Object>> {eval_exp(t, env)})
+        .collect();
+        
+    if let ObjectKind::Procedure(proc) = &proc.kind {
+        let new_env = Environment::new(&proc.env);
+        if !proc.args.is_variadic && proc.args.required != args.len() {
+            bail!("wrong number of arguments (required {}, got {}", proc.args.required, args.len());
+        }
+        if proc.args.required < args.len() {
+            bail!("wrong number of arguments (required {}, got {}", proc.args.required, args.len());
+        }
+
+        for i in 0..proc.args.required {
+            new_env.variables.borrow_mut().insert(proc.args.ids.get(i).unwrap().clone(), RefCell::new(args.pop_front().unwrap()?));
+        }
+        if proc.args.is_variadic {
+            let mut variadic = Rc::new(Object{kind: ObjectKind::Empty});
+            for _ in 0..args.len() {
+                variadic = Rc::new(Object{kind: ObjectKind::Pair{
+                    car: Ref::Rc(RefCell::new(args.pop_back().unwrap()?)),
+                    cdr: Ref::Rc(RefCell::new(variadic))
+                }});
+            }
+            new_env.variables.borrow_mut().insert(proc.args.ids.get(proc.args.required).unwrap().clone(), RefCell::new(variadic));
+        }
+        
+        eval_body(&proc.body, &Rc::new(new_env))
+    } else {
+        Err(anyhow!("invalid application: {}", token))
+    }
 }
 
 fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
@@ -296,7 +331,7 @@ fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environmen
         }
         arg = arg.cdr().unwrap();
     }
-    let required = args.len() as u32;
+    let required = args.len();
     match arg {
         Token::Id(id) => {
             args.push(id.clone());

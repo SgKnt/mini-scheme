@@ -114,5 +114,5 @@ pub struct Procedure {
 pub struct Args {
     pub ids: Vec<String>,
     pub is_variadic: bool,
-    pub required: u32,
+    pub required: usize,
 }
