@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -100,8 +101,9 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                     env)?;
                                 let mut env = env;
                                 loop {
-                                    if let Some(v) = env.variables.borrow().get(&id.to_string()) {
-                                        env.variables.borrow_mut().insert(id.to_string(), RefCell::new(exp)).unwrap();
+                                    let mut vals = env.variables.borrow_mut();
+                                    if let Some(_) = vals.get(&id.to_string()) {
+                                        vals.insert(id.to_string(), RefCell::new(exp)).unwrap();
                                         break Ok(Rc::new(Object{kind: ObjectKind::Undefined}));
                                     }
                                     if let Some(e) = &env.parent {
@@ -320,10 +322,10 @@ fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) ->
     if let ObjectKind::Procedure(proc) = &proc.kind {
         let new_env = Environment::new(&proc.env);
         if !proc.args.is_variadic && proc.args.required != args.len() {
-            bail!("wrong number of arguments (required {}, got {}", proc.args.required, args.len());
+            bail!("wrong number of arguments (required {}, got {})", proc.args.required, args.len());
         }
         if proc.args.required < args.len() {
-            bail!("wrong number of arguments (required {}, got {}", proc.args.required, args.len());
+            bail!("wrong number of arguments (required {}, got {})", proc.args.required, args.len());
         }
 
         for i in 0..proc.args.required {
@@ -382,6 +384,8 @@ fn eval_body(mut token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                 }
                 _ => break
             }
+        } else {
+            break;
         }
     };
     // Expression
