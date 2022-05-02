@@ -6,7 +6,7 @@ use crate::object::{Object};
 
 pub struct Environment {
     pub variables: RefCell<HashMap<String, RefCell<Rc<Object>>>>,
-    pub parent: Option<RefCell<Rc<Environment>>>
+    pub parent: Option<Rc<Environment>>
 }
 
 impl Environment {
@@ -20,7 +20,7 @@ impl Environment {
     pub fn new(parent: &Rc<Environment>) -> Self {
         Environment{
             variables: RefCell::new(HashMap::new()),
-            parent: Some(RefCell::new(parent.clone()))
+            parent: Some(parent.clone())
         }
     }
 
@@ -28,7 +28,7 @@ impl Environment {
         if let Some(v) = self.variables.borrow().get(key) {
             Some(Rc::clone(&*v.borrow()))
         } else if let Some(p) = &self.parent {
-            p.borrow().lookup(key)
+            p.lookup(key)
         } else {
             None
         }

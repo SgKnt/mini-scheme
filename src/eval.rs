@@ -88,7 +88,31 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                             eval_quote(cdr)
                         },
                         "set!" => {
-                            todo!()
+                            ensure_proper_list(token)?;
+                            let id = token
+                                .nth(1)
+                                .with_context(|| format!("syntax error: malformed set!: {}", token))?;
+                            if let Token::Id(id) = id {
+                                let exp = eval_exp(
+                                    token
+                                    .nth(2)
+                                    .with_context(|| format!("syntax error: malformed set!: {}", token))?,
+                                    env)?;
+                                let mut env = env;
+                                loop {
+                                    if let Some(v) = env.variables.borrow().get(&id.to_string()) {
+                                        env.variables.borrow_mut().insert(id.to_string(), RefCell::new(exp)).unwrap();
+                                        break Ok(Rc::new(Object{kind: ObjectKind::Undefined}));
+                                    }
+                                    if let Some(e) = &env.parent {
+                                        env = e;
+                                    } else {
+                                        break Err(anyhow!("symbal not defined: {}", id));
+                                    }
+                                }
+                            } else {
+                                Err(anyhow!(""))
+                            }
                         }
                         "let" => {
                             todo!()
@@ -344,8 +368,31 @@ fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environmen
     }
 }
 
-fn eval_body(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
-    todo!()
+fn eval_body(mut token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+    ensure_proper_list(token)?;
+    // Define
+    let mut def = token.elem().context("syntax error: at least one expression is necessary")?;
+    loop {
+        if let Token::Pair{car, cdr: _} = def {
+            match &**car {
+                Token::Id(s) if s == "define" => {
+                    eval_define(def, env)?;
+                    token = token.next().unwrap();
+                    def = token.elem().context("syntax error: at least one expression is necessary")?;
+                }
+                _ => break
+            }
+        }
+    };
+    // Expression
+    loop {
+        let exp = token.elem().unwrap();
+        if let Token::Empty = token.next().unwrap() {
+            break eval_exp(exp, env)
+        }
+        eval_exp(exp, env)?;
+        token = token.next().unwrap();
+    }
 }
 
 fn ensure_proper_list(token: &Token) -> Result<()> {
