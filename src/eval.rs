@@ -247,7 +247,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                     bail!("syntax error: malformed do: {}", token);
                                 }
                                 steps.push(step);
-                                if let None = val_init_step.nth(3) {
+                                if let Some(_) = val_init_step.nth(3) {
                                     bail!("syntax error: malformed do: {}", token);
                                 }
                             }
