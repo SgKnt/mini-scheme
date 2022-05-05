@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::object::{Object};
+use crate::function::*;
 
 pub struct Environment {
     pub variables: RefCell<HashMap<String, Rc<RefCell<Object>>>>,

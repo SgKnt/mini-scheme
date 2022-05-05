@@ -1,16 +1,15 @@
 use std::borrow::Borrow;
+use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::fmt;
 
+use anyhow::Result;
+
 use crate::env::Environment;
 use crate::token::Token;
 
-pub struct Object {
-    pub kind: ObjectKind
-}
-
-pub enum ObjectKind {
+pub enum Object {
     Number(NumberKind),
     Boolean(bool),
     Pair{
@@ -49,12 +48,12 @@ pub struct Args {
 
 pub struct Subroutine {
     pub args: Args,
-    //pub fun: fn(RefCell<Rc<Object>) -> Rc<Object>
+    pub fun: fn(VecDeque<Result<Rc<RefCell<Object>>>>, &Rc<Environment>) -> Rc<RefCell<Object>>
 }
 
 impl Object {
     pub fn is_falsy(&self) -> bool {
-        if let ObjectKind::Boolean(false) = self.kind {
+        if let Object::Boolean(false) = self {
             true
         } else {
             false
@@ -64,46 +63,46 @@ impl Object {
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            ObjectKind::Number(num) => match num {
+        match &self {
+            Object::Number(num) => match num {
                 NumberKind::Int(i) => write!(f, "{}", i),
                 NumberKind::Float(fl) => write!(f, "{}", fl),
             }
-            ObjectKind::Boolean(b) => {
+            Object::Boolean(b) => {
                 if *b {
                     write!(f, "#t")
                 } else {
                     write!(f, "#f")
                 }
             }
-            ObjectKind::Procedure(_) => write!(f, "#<procedure>"),
-            ObjectKind::Subroutine(_) => write!(f, "#<subroutine>"),
-            ObjectKind::String(s) => write!(f, "\"{}\"", s),
-            ObjectKind::Symbol(s) => write!(f, "{}", s),
-            ObjectKind::Undefined => write!(f, "#<undef>"),
-            ObjectKind::Empty => write!(f, "()"),
-            ObjectKind::Pair{car, cdr} => match car {
+            Object::Procedure(_) => write!(f, "#<procedure>"),
+            Object::Subroutine(_) => write!(f, "#<subroutine>"),
+            Object::String(s) => write!(f, "\"{}\"", s),
+            Object::Symbol(s) => write!(f, "{}", s),
+            Object::Undefined => write!(f, "#<undef>"),
+            Object::Empty => write!(f, "()"),
+            Object::Pair{car, cdr} => match car {
                 Ref::Rc(car) => match cdr {
                     Ref::Rc(cdr) =>  {
                         let cdr = (**cdr).borrow();
-                        match cdr.kind {
-                            ObjectKind::Pair{..} => {
+                        match &*cdr {
+                            Object::Pair{..} => {
                                 let cdr = format!("{}", cdr);
                                 write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
                             }
-                            ObjectKind::Empty => write!(f, "({})", (**car).borrow()),
+                            Object::Empty => write!(f, "({})", (**car).borrow()),
                             _ => write!(f, "({} {})", (**car).borrow(), cdr)
                         }
                     }
                     Ref::Weak(cdr) =>  {
                         let cdr = cdr.upgrade().unwrap();
                         let cdr = (*cdr).borrow();
-                        match cdr.kind {
-                            ObjectKind::Pair{..} => {
+                        match &*cdr {
+                            Object::Pair{..} => {
                                 let cdr = format!("{}", cdr);
                                 write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
                             }
-                            ObjectKind::Empty => write!(f, "({})", (**car).borrow()),
+                            Object::Empty => write!(f, "({})", (**car).borrow()),
                             _ => write!(f, "({} {})", (**car).borrow(), cdr)
                         }
                     }
@@ -111,24 +110,24 @@ impl fmt::Display for Object {
                 Ref::Weak(car) => match cdr {
                     Ref::Rc(cdr) => {
                         let cdr = (**cdr).borrow();
-                        match cdr.kind {
-                            ObjectKind::Pair{..} => {
+                        match &*cdr {
+                            Object::Pair{..} => {
                                 let cdr = format!("{}", cdr.borrow());
                                 write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
                             }
-                            ObjectKind::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
+                            Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
                             _ => write!(f, "({} {})", (*car.upgrade().unwrap()).borrow(), cdr.borrow())
                         }
                     }
                     Ref::Weak(cdr) => {
                         let cdr = cdr.upgrade().unwrap();
                         let cdr = (*cdr).borrow();
-                        match cdr.kind {
-                            ObjectKind::Pair{..} => {
+                        match &*cdr {
+                            Object::Pair{..} => {
                                 let cdr = format!("{}", cdr);
                                 write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
                             }
-                            ObjectKind::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
+                            Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
                             _ => write!(f, "({} {})", (*car.upgrade().unwrap()).borrow(), cdr)
                         }
                     }

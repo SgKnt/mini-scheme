@@ -4,6 +4,7 @@ mod object;
 //mod val;
 mod env;
 mod eval;
+mod function;
 
 use std::io::{self, Write};
 use std::rc::Rc;
