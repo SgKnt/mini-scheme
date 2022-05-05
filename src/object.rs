@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::fmt;
@@ -18,9 +19,37 @@ pub enum ObjectKind {
     },
     Empty,
     Procedure(Procedure),
+    Subroutine(Subroutine),
     Symbol(String),
     String(String),
     Undefined,
+}
+
+pub enum NumberKind {
+    Int(i64),
+    Float(f64)
+}
+
+pub enum Ref {
+    Rc(Rc<RefCell<Object>>),
+    Weak(Weak<RefCell<Object>>)
+}
+
+pub struct Procedure {
+    pub env: Rc<Environment>,
+    pub args: Args,
+    pub body: Token
+}
+
+pub struct Args {
+    pub ids: Vec<String>,
+    pub is_variadic: bool,
+    pub required: usize,
+}
+
+pub struct Subroutine {
+    pub args: Args,
+    //pub fun: fn(RefCell<Rc<Object>) -> Rc<Object>
 }
 
 impl Object {
@@ -48,45 +77,60 @@ impl fmt::Display for Object {
                 }
             }
             ObjectKind::Procedure(_) => write!(f, "#<procedure>"),
+            ObjectKind::Subroutine(_) => write!(f, "#<subroutine>"),
             ObjectKind::String(s) => write!(f, "\"{}\"", s),
             ObjectKind::Symbol(s) => write!(f, "{}", s),
             ObjectKind::Undefined => write!(f, "#<undef>"),
             ObjectKind::Empty => write!(f, "()"),
             ObjectKind::Pair{car, cdr} => match car {
                 Ref::Rc(car) => match cdr {
-                    Ref::Rc(cdr) => match cdr.borrow().kind {
-                        ObjectKind::Pair{..} => {
-                            let cdr = format!("{}", cdr.borrow());
-                            write!(f, "({} {}", car.borrow(), cdr.split_at(1).1)
+                    Ref::Rc(cdr) =>  {
+                        let cdr = (**cdr).borrow();
+                        match cdr.kind {
+                            ObjectKind::Pair{..} => {
+                                let cdr = format!("{}", cdr);
+                                write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
+                            }
+                            ObjectKind::Empty => write!(f, "({})", (**car).borrow()),
+                            _ => write!(f, "({} {})", (**car).borrow(), cdr)
                         }
-                        ObjectKind::Empty => write!(f, "({})", car.borrow()),
-                        _ => write!(f, "({} {})", car.borrow(), cdr.borrow())
                     }
-                    Ref::Weak(cdr) => match cdr.borrow().upgrade().unwrap().kind {
-                        ObjectKind::Pair{..} => {
-                            let cdr = format!("{}", cdr.borrow().upgrade().unwrap());
-                            write!(f, "({} {}", car.borrow(), cdr.split_at(1).1)
+                    Ref::Weak(cdr) =>  {
+                        let cdr = cdr.upgrade().unwrap();
+                        let cdr = (*cdr).borrow();
+                        match cdr.kind {
+                            ObjectKind::Pair{..} => {
+                                let cdr = format!("{}", cdr);
+                                write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
+                            }
+                            ObjectKind::Empty => write!(f, "({})", (**car).borrow()),
+                            _ => write!(f, "({} {})", (**car).borrow(), cdr)
                         }
-                        ObjectKind::Empty => write!(f, "({})", car.borrow()),
-                        _ => write!(f, "({} {})", car.borrow(), cdr.borrow().upgrade().unwrap())
                     }
                 }
                 Ref::Weak(car) => match cdr {
-                    Ref::Rc(cdr) => match cdr.borrow().kind {
-                        ObjectKind::Pair{..} => {
-                            let cdr = format!("{}", cdr.borrow());
-                            write!(f, "({} {}", car.borrow().upgrade().unwrap(), cdr.split_at(1).1)
+                    Ref::Rc(cdr) => {
+                        let cdr = (**cdr).borrow();
+                        match cdr.kind {
+                            ObjectKind::Pair{..} => {
+                                let cdr = format!("{}", cdr.borrow());
+                                write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
+                            }
+                            ObjectKind::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
+                            _ => write!(f, "({} {})", (*car.upgrade().unwrap()).borrow(), cdr.borrow())
                         }
-                        ObjectKind::Empty => write!(f, "({})", car.borrow().upgrade().unwrap()),
-                        _ => write!(f, "({} {})", car.borrow().upgrade().unwrap(), cdr.borrow())
                     }
-                    Ref::Weak(cdr) => match cdr.borrow().upgrade().unwrap().kind {
-                        ObjectKind::Pair{..} => {
-                            let cdr = format!("{}", cdr.borrow().upgrade().unwrap());
-                            write!(f, "({} {}", car.borrow().upgrade().unwrap(), cdr.split_at(1).1)
+                    Ref::Weak(cdr) => {
+                        let cdr = cdr.upgrade().unwrap();
+                        let cdr = (*cdr).borrow();
+                        match cdr.kind {
+                            ObjectKind::Pair{..} => {
+                                let cdr = format!("{}", cdr);
+                                write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
+                            }
+                            ObjectKind::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
+                            _ => write!(f, "({} {})", (*car.upgrade().unwrap()).borrow(), cdr)
                         }
-                        ObjectKind::Empty => write!(f, "({})", car.borrow().upgrade().unwrap()),
-                        _ => write!(f, "({} {})", car.borrow().upgrade().unwrap(), cdr.borrow().upgrade().unwrap())
                     }
                 }
             }
@@ -94,25 +138,6 @@ impl fmt::Display for Object {
     }
 }
 
-pub enum Ref {
-    Rc(RefCell<Rc<Object>>),
-    Weak(RefCell<Weak<Object>>)
-}
 
 
-pub enum NumberKind {
-    Int(i64),
-    Float(f64)
-}
 
-pub struct Procedure {
-    pub env: Rc<Environment>,
-    pub args: Args,
-    pub body: Token
-}
-
-pub struct Args {
-    pub ids: Vec<String>,
-    pub is_variadic: bool,
-    pub required: usize,
-}

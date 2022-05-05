@@ -68,7 +68,7 @@ fn main() {
                 Ok(token) => {
                     let res = eval(token, &global_env);
                     match res {
-                        Ok(obj) => println!("{}", obj),
+                        Ok(obj) => println!("{}", obj.borrow()),
                         Err(err) => println!("{:?}", err),
                     }
                 }

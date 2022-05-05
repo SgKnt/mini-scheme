@@ -8,7 +8,7 @@ use super::object::*;
 use super::token::*;
 use super::env::*;
 
-pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     // Exp, Define, (load String)
     match token {
         Token::Pair{car, cdr} => match &**car {
@@ -24,7 +24,7 @@ pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     }
 }
 
-pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     let def_token = token;
     let token = token.next().unwrap();
     ensure_proper_list(token)?;
@@ -37,16 +37,16 @@ pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                 .unwrap()
                 .elem()
                 .map(|t| eval_exp(t, env))
-                .unwrap_or_else(|| Ok(Rc::new(Object{kind: ObjectKind::Undefined})))?;
-            env.variables.borrow_mut().insert(id.clone(), RefCell::new(obj));
-            Ok(Rc::new(Object{kind: ObjectKind::Symbol(id.clone())}))
+                .unwrap_or_else(|| Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Undefined}))))?;
+            env.variables.borrow_mut().insert(id.clone(), obj);
+            Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Symbol(id.clone())})))
         }
         Token::Pair{car: id, cdr: args} => {
             if let Token::Id(id) = &**id {
                 let body = token.next().unwrap();
                 let obj = eval_lambda(token, args, body, env)?;
-                env.variables.borrow_mut().insert(id.clone(), RefCell::new(obj));
-                Ok(Rc::new(Object{kind: ObjectKind::Symbol(id.clone())}))
+                env.variables.borrow_mut().insert(id.clone(), obj);
+                Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Symbol(id.clone())})))
             } else {
                 Err(anyhow!("syntax error: {}", def_token))
             }
@@ -55,17 +55,17 @@ pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     }
 }
 
-pub fn eval_load(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+pub fn eval_load(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     todo!()
 }
 
-fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     match token {
-        &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
-        &Token::Float(f) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))})),
-        &Token::Boolean(b) => Ok(Rc::new(Object{kind: ObjectKind::Boolean(b)})),
-        Token::String(s) => Ok(Rc::new(Object{kind: ObjectKind::String(s.clone())})),
-        &Token::Empty => Ok(Rc::new(Object{kind: ObjectKind::Empty})),
+        &Token::Int(i) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))}))),
+        &Token::Float(f) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))}))),
+        &Token::Boolean(b) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Boolean(b)}))),
+        Token::String(s) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::String(s.clone())}))),
+        Token::Empty => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Empty}))),
         Token::Symbol(s) => eval_quote(&*s),
         Token::Id(id) => if let Some(var) = env.lookup(id) {
             Ok(Rc::clone(&var))
@@ -102,8 +102,8 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                 loop {
                                     let mut vals = env.variables.borrow_mut();
                                     if let Some(_) = vals.get(&id.to_string()) {
-                                        vals.insert(id.to_string(), RefCell::new(exp)).unwrap();
-                                        break Ok(Rc::new(Object{kind: ObjectKind::Undefined}));
+                                        vals.insert(id.to_string(), exp).unwrap();
+                                        break Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Undefined})));
                                     }
                                     if let Some(e) = &env.parent {
                                         env = e;
@@ -141,17 +141,17 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                 Token::Pair{car: exp3_car, cdr: exp3_cdr} => {
                                     if !exp3_cdr.is_empty() {
                                         Err(anyhow!("syntax error: malformed if: {}", token))
-                                    } else if !cond.is_falsy() {
+                                    } else if !cond.borrow().is_falsy() {
                                         eval_exp(exp2, env)
                                     } else {
                                         eval_exp(exp3_car, env)
                                     }
                                 }
                                 Token::Empty => {
-                                    if !cond.is_falsy() {
+                                    if !cond.borrow().is_falsy() {
                                         eval_exp(exp2, env)
                                     } else {
-                                        Ok(Rc::new(Object{kind: ObjectKind::Undefined}))
+                                        Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Undefined})))
                                     }
                                 }
                                 _ => {
@@ -165,7 +165,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                 bail!("syntax error: at least one clause is required for cond: {}", token);
                             }
 
-                            let mut res = Ok(Rc::new(Object{kind: ObjectKind::Undefined}));
+                            let mut res = Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Undefined})));
                             for clause in &**cdr {
                                 println!("debug: clause = {}", clause);
                                 if let Token::Pair{car: test, cdr: exps} = clause {
@@ -179,7 +179,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                                 }
                                             }
                                             _ => {
-                                                if !eval_exp(test, env)?.is_falsy() {
+                                                if !eval_exp(test, env)?.borrow().is_falsy() {
                                                     for exp in &**exps {
                                                         res = Ok(eval_exp(exp, env)?);
                                                     }
@@ -197,10 +197,10 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                         }
                         "and" => {
                             ensure_proper_list(cdr)?;
-                            let mut res = Rc::new(Object{kind: ObjectKind::Boolean(true)});
+                            let mut res = Rc::new(RefCell::new(Object{kind: ObjectKind::Boolean(true)}));
                             for test in &**cdr {
                                 res = eval_exp(test, env)?;
-                                if res.is_falsy() {
+                                if res.borrow().is_falsy() {
                                     break;
                                 }
                             }
@@ -208,10 +208,10 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                         }
                         "or" => {
                             ensure_proper_list(cdr)?;
-                            let mut res = Rc::new(Object{kind: ObjectKind::Boolean(false)});
+                            let mut res = Rc::new(RefCell::new(Object{kind: ObjectKind::Boolean(false)}));
                             for test in &**cdr {
                                 res = eval_exp(test, env)?;
-                                if !res.is_falsy() {
+                                if !res.borrow().is_falsy() {
                                     break;
                                 }
                             }
@@ -219,7 +219,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                         }
                         "begin" => {
                             ensure_proper_list(cdr)?;
-                            let mut res = Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(0))});
+                            let mut res = Rc::new(RefCell::new(Object{kind: ObjectKind::Number(NumberKind::Int(0))}));
                             for exp in &**cdr {
                                 res = eval_exp(exp, env)?;
                             }
@@ -242,7 +242,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                 let step = val_init_step.nth(2).with_context(|| format!("syntax error: malformed do: {}", token))?;
                                 if let Token::Id(id) = val {
                                     vals.push(id.as_ref());
-                                    do_env.variables.borrow_mut().insert(id.clone(), RefCell::new(eval_exp(init, env)?));
+                                    do_env.variables.borrow_mut().insert(id.clone(), eval_exp(init, env)?);
                                 } else {
                                     bail!("syntax error: malformed do: {}", token);
                                 }
@@ -268,11 +268,11 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
                                 .next()
                                 .with_context(|| format!("syntax error: malformed do: {}", token))?;
                             
-                            while !eval_exp(test, &do_env)?.is_falsy() {
+                            while !eval_exp(test, &do_env)?.borrow().is_falsy() {
                                 eval_body(cmds, &do_env)?;
                             }
 
-                            let mut res = Rc::new(Object{kind: ObjectKind::Boolean(true)});
+                            let mut res = Rc::new(RefCell::new(Object{kind: ObjectKind::Boolean(true)}));
                             for exp in test_exp.next() {
                                 res = eval_exp(exp, &do_env)?;
                             }
@@ -292,32 +292,33 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
     }
 }
 
-fn eval_quote(token: &Token) -> Result<Rc<Object>> {
+fn eval_quote(token: &Token) -> Result<Rc<RefCell<Object>>> {
     // "token" must be elements of Token::Symbol
     match token {
-        &Token::Int(i) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))})),
-        &Token::Float(f) => Ok(Rc::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))})),
-        &Token::Boolean(b) => Ok(Rc::new(Object{kind: ObjectKind::Boolean(b)})),
-        Token::String(s) => Ok(Rc::new(Object{kind: ObjectKind::String(s.clone())})),
-        &Token::Empty => Ok(Rc::new(Object{kind: ObjectKind::Empty})),
-        Token::Symbol(_) => Ok(Rc::new(Object{kind: ObjectKind::Symbol(format!("{}", token))})),
-        Token::Id(id) => Ok(Rc::new(Object{kind: ObjectKind::Symbol(format!("{}", id))})),
-        Token::Pair{car, cdr} => Ok(Rc::new(Object{kind: ObjectKind::Pair{
-            car: Ref::Rc(RefCell::new(eval_quote(&**car)?)), 
-            cdr: Ref::Rc(RefCell::new(eval_quote(&**cdr)?))
-        }})),
+        &Token::Int(i) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Number(NumberKind::Int(i))}))),
+        &Token::Float(f) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Number(NumberKind::Float(f))}))),
+        &Token::Boolean(b) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Boolean(b)}))),
+        Token::String(s) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::String(s.clone())}))),
+        &Token::Empty => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Empty}))),
+        Token::Symbol(_) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Symbol(format!("{}", token))}))),
+        Token::Id(id) => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Symbol(format!("{}", id))}))),
+        Token::Pair{car, cdr} => Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Pair{
+            car: Ref::Rc(eval_quote(&**car)?), 
+            cdr: Ref::Rc(eval_quote(&**cdr)?)
+        }}))),
     }
 }
 
-fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     // argument "token" is for error messages
     ensure_proper_list(args)?;
     let proc = eval_exp(proc, env)?;
-    let mut args: VecDeque<Result<Rc<Object>>> = args
+    let mut args: VecDeque<Result<Rc<RefCell<Object>>>> = args
         .into_iter()
-        .map(|t| -> Result<Rc<Object>> {eval_exp(t, env)})
+        .map(|t| -> Result<Rc<RefCell<Object>>> {eval_exp(t, env)})
         .collect();
-        
+    
+    let proc = proc.borrow();
     if let ObjectKind::Procedure(proc) = &proc.kind {
         let new_env = Environment::new(&proc.env);
         if !proc.args.is_variadic && proc.args.required != args.len() {
@@ -328,17 +329,17 @@ fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) ->
         }
 
         for i in 0..proc.args.required {
-            new_env.variables.borrow_mut().insert(proc.args.ids.get(i).unwrap().clone(), RefCell::new(args.pop_front().unwrap()?));
+            new_env.variables.borrow_mut().insert(proc.args.ids.get(i).unwrap().clone(), args.pop_front().unwrap()?);
         }
         if proc.args.is_variadic {
-            let mut variadic = Rc::new(Object{kind: ObjectKind::Empty});
+            let mut variadic = Rc::new(RefCell::new(Object{kind: ObjectKind::Empty}));
             for _ in 0..args.len() {
-                variadic = Rc::new(Object{kind: ObjectKind::Pair{
-                    car: Ref::Rc(RefCell::new(args.pop_back().unwrap()?)),
-                    cdr: Ref::Rc(RefCell::new(variadic))
-                }});
+                variadic = Rc::new(RefCell::new(Object{kind: ObjectKind::Pair{
+                    car: Ref::Rc(args.pop_back().unwrap()?),
+                    cdr: Ref::Rc(variadic)
+                }}));
             }
-            new_env.variables.borrow_mut().insert(proc.args.ids.get(proc.args.required).unwrap().clone(), RefCell::new(variadic));
+            new_env.variables.borrow_mut().insert(proc.args.ids.get(proc.args.required).unwrap().clone(), variadic);
         }
         
         eval_body(&proc.body, &Rc::new(new_env))
@@ -347,7 +348,7 @@ fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) ->
     }
 }
 
-fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     let mut args = Vec::new();
     while let Some(id) = arg.elem() {
         match id {
@@ -360,16 +361,24 @@ fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environmen
     match arg {
         Token::Id(id) => {
             args.push(id.clone());
-            Ok(Rc::new(Object{kind: ObjectKind::Procedure(Procedure{env: Rc::clone(env), args: Args{ids: args, is_variadic: true, required}, body: body.clone()})}))
+            Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Procedure(Procedure{
+                env: Rc::clone(env), 
+                args: Args{ids: args, is_variadic: true, required}, 
+                body: body.clone()
+            })})))
         }
         Token::Empty => {
-            Ok(Rc::new(Object{kind: ObjectKind::Procedure(Procedure{env: Rc::clone(env), args: Args{ids: args, is_variadic: false, required}, body: body.clone()})}))
+            Ok(Rc::new(RefCell::new(Object{kind: ObjectKind::Procedure(Procedure{
+                env: Rc::clone(env), 
+                args: Args{ids: args, is_variadic: false, required}, 
+                body: body.clone()
+            })})))
         }
         _ => Err(anyhow!("syntax error: argment must be identifier: {}", token))
     }
 }
 
-fn eval_body(mut token: &Token, env: &Rc<Environment>) -> Result<Rc<Object>> {
+fn eval_body(mut token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     ensure_proper_list(token)?;
     // Define
     let mut def = token.elem().context("syntax error: at least one expression is necessary")?;
