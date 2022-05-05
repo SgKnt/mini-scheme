@@ -47,8 +47,9 @@ pub struct Args {
 }
 
 pub struct Subroutine {
-    pub args: Args,
-    pub fun: fn(VecDeque<Result<Rc<RefCell<Object>>>>, &Rc<Environment>) -> Rc<RefCell<Object>>
+    pub required: usize,
+    pub is_variadic: bool,
+    pub fun: fn(VecDeque<Result<Rc<RefCell<Object>>>>, &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
 }
 
 impl Object {

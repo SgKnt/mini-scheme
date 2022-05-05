@@ -38,14 +38,14 @@ pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Ob
                 .elem()
                 .map(|t| eval_exp(t, env))
                 .unwrap_or_else(|| Ok(Rc::new(RefCell::new(Object::Undefined))))?;
-            env.variables.borrow_mut().insert(id.clone(), obj);
+            env.vars.borrow_mut().insert(id.clone(), obj);
             Ok(Rc::new(RefCell::new(Object::Symbol(id.clone()))))
         }
         Token::Pair{car: id, cdr: args} => {
             if let Token::Id(id) = &**id {
                 let body = token.next().unwrap();
                 let obj = eval_lambda(token, args, body, env)?;
-                env.variables.borrow_mut().insert(id.clone(), obj);
+                env.vars.borrow_mut().insert(id.clone(), obj);
                 Ok(Rc::new(RefCell::new(Object::Symbol(id.clone()))))
             } else {
                 Err(anyhow!("syntax error: {}", def_token))
@@ -74,7 +74,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
         },
         Token::Pair{car, cdr} => match &**car {
             Token::Id(id) => {
-                if env.variables.borrow().get(id).is_some() {
+                if env.lookup(id).is_some() {
                     eval_app(token, car, cdr, env)
                 } else {
                     match id.as_str() {
@@ -100,7 +100,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
                                     env)?;
                                 let mut env = env;
                                 loop {
-                                    let mut vals = env.variables.borrow_mut();
+                                    let mut vals = env.vars.borrow_mut();
                                     if let Some(_) = vals.get(&id.to_string()) {
                                         vals.insert(id.to_string(), exp).unwrap();
                                         break Ok(Rc::new(RefCell::new(Object::Undefined)));
@@ -242,7 +242,7 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
                                 let step = val_init_step.nth(2).with_context(|| format!("syntax error: malformed do: {}", token))?;
                                 if let Token::Id(id) = val {
                                     vals.push(id.as_ref());
-                                    do_env.variables.borrow_mut().insert(id.clone(), eval_exp(init, env)?);
+                                    do_env.vars.borrow_mut().insert(id.clone(), eval_exp(init, env)?);
                                 } else {
                                     bail!("syntax error: malformed do: {}", token);
                                 }
@@ -319,32 +319,43 @@ fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) ->
         .collect();
     
     let proc = proc.borrow();
-    if let Object::Procedure(proc) = &*proc {
-        let new_env = Environment::new(&proc.env);
-        if !proc.args.is_variadic && proc.args.required != args.len() {
-            bail!("wrong number of arguments (required {}, got {})", proc.args.required, args.len());
-        }
-        if proc.args.required < args.len() {
-            bail!("wrong number of arguments (required {}, got {})", proc.args.required, args.len());
-        }
-
-        for i in 0..proc.args.required {
-            new_env.variables.borrow_mut().insert(proc.args.ids.get(i).unwrap().clone(), args.pop_front().unwrap()?);
-        }
-        if proc.args.is_variadic {
-            let mut variadic = Rc::new(RefCell::new(Object::Empty));
-            for _ in 0..args.len() {
-                variadic = Rc::new(RefCell::new(Object::Pair{
-                    car: Ref::Rc(args.pop_back().unwrap()?),
-                    cdr: Ref::Rc(variadic)
-                }));
+    match &*proc {
+        Object::Procedure(proc) => {
+            let new_env = Environment::new(&proc.env);
+            if !proc.args.is_variadic && proc.args.required != args.len() {
+                bail!("wrong number of arguments (required {}, got {})", proc.args.required, args.len());
             }
-            new_env.variables.borrow_mut().insert(proc.args.ids.get(proc.args.required).unwrap().clone(), variadic);
+            if proc.args.required > args.len() {
+                bail!("wrong number of arguments (required {}, got {})", proc.args.required, args.len());
+            }
+    
+            for i in 0..proc.args.required {
+                new_env.vars.borrow_mut().insert(proc.args.ids.get(i).unwrap().clone(), args.pop_front().unwrap()?);
+            }
+            if proc.args.is_variadic {
+                let mut variadic = Rc::new(RefCell::new(Object::Empty));
+                for _ in 0..args.len() {
+                    variadic = Rc::new(RefCell::new(Object::Pair{
+                        car: Ref::Rc(args.pop_back().unwrap()?),
+                        cdr: Ref::Rc(variadic)
+                    }));
+                }
+                new_env.vars.borrow_mut().insert(proc.args.ids.get(proc.args.required).unwrap().clone(), variadic);
+            }
+            
+            eval_body(&proc.body, &Rc::new(new_env))
         }
-        
-        eval_body(&proc.body, &Rc::new(new_env))
-    } else {
-        Err(anyhow!("invalid application: {}", token))
+        Object::Subroutine(sub) => {
+            if !sub.is_variadic && sub.required != args.len() {
+                bail!("wrong number of arguments (required {}, got {})", sub.required, args.len());
+            }
+            if sub.required > args.len() {
+                bail!("wrong number of arguments (required {}, got {})", sub.required, args.len());
+            }
+
+            (sub.fun)(args, env)
+        }
+        _ => Err(anyhow!("invalid application: {}", token))
     }
 }
 

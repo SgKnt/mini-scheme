@@ -2,31 +2,45 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::object::{Object};
-use crate::function::*;
+use crate::object::*;
+use crate::function;
 
 pub struct Environment {
-    pub variables: RefCell<HashMap<String, Rc<RefCell<Object>>>>,
+    pub vars: RefCell<HashMap<String, Rc<RefCell<Object>>>>,
     pub parent: Option<Rc<Environment>>
 }
 
 impl Environment {
     pub fn new_global() -> Self {
+        // add functions
+        let mut vars = HashMap::new();
+        vars.insert("number?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::number::is_number
+        }))));
+        vars.insert("+".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 0,
+            fun: function::number::add
+        }))));
+
+
         Environment{
-            variables: RefCell::new(HashMap::new()),
+            vars: RefCell::new(vars),
             parent: None
         }
     }
 
     pub fn new(parent: &Rc<Environment>) -> Self {
         Environment{
-            variables: RefCell::new(HashMap::new()),
+            vars: RefCell::new(HashMap::new()),
             parent: Some(parent.clone())
         }
     }
 
     pub fn lookup(&self, key: &str) -> Option<Rc<RefCell<Object>>> {
-        if let Some(v) = self.variables.borrow().get(key) {
+        if let Some(v) = self.vars.borrow().get(key) {
             Some(Rc::clone(v))
         } else if let Some(p) = &self.parent {
             p.lookup(key)
