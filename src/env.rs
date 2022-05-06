@@ -14,6 +14,7 @@ impl Environment {
     pub fn new_global() -> Self {
         // add functions
         let mut vars = HashMap::new();
+        // number
         vars.insert("number?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
             is_variadic: false,
             required: 1,
@@ -64,6 +65,7 @@ impl Environment {
             required: 2,
             fun: function::number::ge
         }))));
+        // boolean
         vars.insert("boolean?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
             is_variadic: false,
             required: 1,
@@ -73,6 +75,22 @@ impl Environment {
             is_variadic: false,
             required: 1,
             fun: function::bool::not
+        }))));
+        // list
+        vars.insert("null?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::is_null
+        }))));
+        vars.insert("pair?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::is_pair
+        }))));
+        vars.insert("list?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::is_list
         }))));
 
         Environment{
