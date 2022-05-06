@@ -24,6 +24,16 @@ impl Environment {
             required: 0,
             fun: function::number::add
         }))));
+        vars.insert("-".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 1,
+            fun: function::number::minus
+        }))));
+        vars.insert("*".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 0,
+            fun: function::number::mul
+        }))));
 
 
         Environment{

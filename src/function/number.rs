@@ -63,6 +63,11 @@ pub fn minus(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environm
         bail!("number required, but got {}", first.borrow())
     }
 
+    if args.len() == 0 {
+        // unary minus
+        return Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(-acc)))));
+    }
+
     while let Some(obj) = args.pop_front() {
         let obj = obj?;
         let obj = (*obj).borrow();
@@ -81,6 +86,11 @@ pub fn minus(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environm
 }
 
 fn minus_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>, mut acc: f64) -> Result<Rc<RefCell<Object>>> {
+    if args.len() == 0 {
+        // unary minus
+        return Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(-acc)))));
+    }
+
     while let Some(obj) = args.pop_front() {
         let obj = obj?;
         let obj = (*obj).borrow();
@@ -89,6 +99,42 @@ fn minus_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Enviro
                 match num {
                     &NumberKind::Int(i) => acc -= i as f64,
                     &NumberKind::Float(f) => acc -= f,
+                }
+            }
+            _ => bail!("number required, but got {}", obj)
+        }
+    }
+    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
+}
+
+pub fn mul(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let mut acc = 1;
+    while let Some(obj) = args.pop_front() {
+        let obj = obj?;
+        let obj = (*obj).borrow();
+        match &*obj {
+            Object::Number(num) => {
+                match num {
+                    NumberKind::Int(i) => acc *= i,
+                    NumberKind::Float(f) => 
+                        return add_float(args, _env, f * (acc as f64))
+                }
+            }
+            _ => bail!("number required, but got {}", obj)
+        }
+    }
+    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(acc)))))
+}
+
+fn mul_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>, mut acc: f64) -> Result<Rc<RefCell<Object>>> {
+    while let Some(obj) = args.pop_front() {
+        let obj = obj?;
+        let obj = (*obj).borrow();
+        match &*obj {
+            Object::Number(num) => {
+                match num {
+                    &NumberKind::Int(i) => acc *= i as f64,
+                    &NumberKind::Float(f) => acc *= f,
                 }
             }
             _ => bail!("number required, but got {}", obj)
