@@ -39,6 +39,31 @@ impl Environment {
             required: 1,
             fun: function::number::div
         }))));
+        vars.insert("=".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 2,
+            fun: function::number::eq
+        }))));
+        vars.insert("<".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 2,
+            fun: function::number::lt
+        }))));
+        vars.insert("<=".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 2,
+            fun: function::number::le
+        }))));
+        vars.insert(">".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 2,
+            fun: function::number::gt
+        }))));
+        vars.insert(">=".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 2,
+            fun: function::number::ge
+        }))));
 
         Environment{
             vars: RefCell::new(vars),
