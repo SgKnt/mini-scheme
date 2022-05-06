@@ -92,7 +92,7 @@ impl fmt::Display for Object {
                                 write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
                             }
                             Object::Empty => write!(f, "({})", (**car).borrow()),
-                            _ => write!(f, "({} {})", (**car).borrow(), cdr)
+                            _ => write!(f, "({} . {})", (**car).borrow(), cdr)
                         }
                     }
                     Ref::Weak(cdr) =>  {
@@ -104,7 +104,7 @@ impl fmt::Display for Object {
                                 write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
                             }
                             Object::Empty => write!(f, "({})", (**car).borrow()),
-                            _ => write!(f, "({} {})", (**car).borrow(), cdr)
+                            _ => write!(f, "({} . {})", (**car).borrow(), cdr)
                         }
                     }
                 }
@@ -117,7 +117,7 @@ impl fmt::Display for Object {
                                 write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
                             }
                             Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
-                            _ => write!(f, "({} {})", (*car.upgrade().unwrap()).borrow(), cdr.borrow())
+                            _ => write!(f, "({} . {})", (*car.upgrade().unwrap()).borrow(), cdr.borrow())
                         }
                     }
                     Ref::Weak(cdr) => {
@@ -129,7 +129,7 @@ impl fmt::Display for Object {
                                 write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
                             }
                             Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
-                            _ => write!(f, "({} {})", (*car.upgrade().unwrap()).borrow(), cdr)
+                            _ => write!(f, "({} . {})", (*car.upgrade().unwrap()).borrow(), cdr)
                         }
                     }
                 }
