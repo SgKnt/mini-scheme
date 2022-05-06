@@ -13,8 +13,8 @@ pub enum Object {
     Number(NumberKind),
     Boolean(bool),
     Pair{
-        car: Ref,
-        cdr: Ref
+        car: Rc<RefCell<Object>>,
+        cdr: Rc<RefCell<Object>>,
     },
     Empty,
     Procedure(Procedure),
@@ -29,10 +29,11 @@ pub enum NumberKind {
     Float(f64)
 }
 
-pub enum Ref {
-    Rc(Rc<RefCell<Object>>),
-    Weak(Weak<RefCell<Object>>)
-}
+// pub enum Ref {
+//     Rc(Rc<RefCell<Object>>),
+//     Weak(Weak<RefCell<Object>>)
+// }
+
 
 pub struct Procedure {
     pub env: Rc<Environment>,
@@ -82,57 +83,65 @@ impl fmt::Display for Object {
             Object::Symbol(s) => write!(f, "{}", s),
             Object::Undefined => write!(f, "#<undef>"),
             Object::Empty => write!(f, "()"),
-            Object::Pair{car, cdr} => match car {
-                Ref::Rc(car) => match cdr {
-                    Ref::Rc(cdr) =>  {
-                        let cdr = (**cdr).borrow();
-                        match &*cdr {
-                            Object::Pair{..} => {
-                                let cdr = format!("{}", cdr);
-                                write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
-                            }
-                            Object::Empty => write!(f, "({})", (**car).borrow()),
-                            _ => write!(f, "({} . {})", (**car).borrow(), cdr)
-                        }
-                    }
-                    Ref::Weak(cdr) =>  {
-                        let cdr = cdr.upgrade().unwrap();
-                        let cdr = (*cdr).borrow();
-                        match &*cdr {
-                            Object::Pair{..} => {
-                                let cdr = format!("{}", cdr);
-                                write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
-                            }
-                            Object::Empty => write!(f, "({})", (**car).borrow()),
-                            _ => write!(f, "({} . {})", (**car).borrow(), cdr)
-                        }
-                    }
+            Object::Pair{car, cdr} => match &*(**cdr).borrow(){
+                Object::Pair{..} => {
+                    let cdr = format!("{}", (**cdr).borrow());
+                    write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
                 }
-                Ref::Weak(car) => match cdr {
-                    Ref::Rc(cdr) => {
-                        let cdr = (**cdr).borrow();
-                        match &*cdr {
-                            Object::Pair{..} => {
-                                let cdr = format!("{}", cdr.borrow());
-                                write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
-                            }
-                            Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
-                            _ => write!(f, "({} . {})", (*car.upgrade().unwrap()).borrow(), cdr.borrow())
-                        }
-                    }
-                    Ref::Weak(cdr) => {
-                        let cdr = cdr.upgrade().unwrap();
-                        let cdr = (*cdr).borrow();
-                        match &*cdr {
-                            Object::Pair{..} => {
-                                let cdr = format!("{}", cdr);
-                                write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
-                            }
-                            Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
-                            _ => write!(f, "({} . {})", (*car.upgrade().unwrap()).borrow(), cdr)
-                        }
-                    }
+                Object::Empty => {
+                    write!(f, "({})", (**car).borrow())
                 }
+                _ => write!(f, "({} . {})", (**car).borrow(), (**cdr).borrow())
+                // Ref::Rc(car) => match cdr {
+                //     Ref::Rc(cdr) =>  {
+                //         let cdr = (**cdr).borrow();
+                //         match &*cdr {
+                //             Object::Pair{..} => {
+                //                 let cdr = format!("{}", cdr);
+                //                 write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
+                //             }
+                //             Object::Empty => write!(f, "({})", (**car).borrow()),
+                //             _ => write!(f, "({} . {})", (**car).borrow(), cdr)
+                //         }
+                //     }
+                //     Ref::Weak(cdr) =>  {
+                //         let cdr = cdr.upgrade().unwrap();
+                //         let cdr = (*cdr).borrow();
+                //         match &*cdr {
+                //             Object::Pair{..} => {
+                //                 let cdr = format!("{}", cdr);
+                //                 write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
+                //             }
+                //             Object::Empty => write!(f, "({})", (**car).borrow()),
+                //             _ => write!(f, "({} . {})", (**car).borrow(), cdr)
+                //         }
+                //     }
+                // }
+                // Ref::Weak(car) => match cdr {
+                //     Ref::Rc(cdr) => {
+                //         let cdr = (**cdr).borrow();
+                //         match &*cdr {
+                //             Object::Pair{..} => {
+                //                 let cdr = format!("{}", cdr.borrow());
+                //                 write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
+                //             }
+                //             Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
+                //             _ => write!(f, "({} . {})", (*car.upgrade().unwrap()).borrow(), cdr.borrow())
+                //         }
+                //     }
+                //     Ref::Weak(cdr) => {
+                //         let cdr = cdr.upgrade().unwrap();
+                //         let cdr = (*cdr).borrow();
+                //         match &*cdr {
+                //             Object::Pair{..} => {
+                //                 let cdr = format!("{}", cdr);
+                //                 write!(f, "({} {}", (*car.upgrade().unwrap()).borrow(), cdr.split_at(1).1)
+                //             }
+                //             Object::Empty => write!(f, "({})", (*car.upgrade().unwrap()).borrow()),
+                //             _ => write!(f, "({} . {})", (*car.upgrade().unwrap()).borrow(), cdr)
+                //         }
+                //     }
+                // }
             }
         }
     }

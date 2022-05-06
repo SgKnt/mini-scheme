@@ -303,8 +303,8 @@ fn eval_quote(token: &Token) -> Result<Rc<RefCell<Object>>> {
         Token::Symbol(_) => Ok(Rc::new(RefCell::new(Object::Symbol(format!("{}", token))))),
         Token::Id(id) => Ok(Rc::new(RefCell::new(Object::Symbol(format!("{}", id))))),
         Token::Pair{car, cdr} => Ok(Rc::new(RefCell::new(Object::Pair{
-            car: Ref::Rc(eval_quote(&**car)?),
-            cdr: Ref::Rc(eval_quote(&**cdr)?)
+            car: eval_quote(&**car)?,
+            cdr: eval_quote(&**cdr)?
         }))),
     }
 }
@@ -336,8 +336,8 @@ fn eval_app(token: &Token, proc: &Token, args: &Token, env: &Rc<Environment>) ->
                 let mut variadic = Rc::new(RefCell::new(Object::Empty));
                 for _ in 0..args.len() {
                     variadic = Rc::new(RefCell::new(Object::Pair{
-                        car: Ref::Rc(args.pop_back().unwrap()?),
-                        cdr: Ref::Rc(variadic)
+                        car: args.pop_back().unwrap()?,
+                        cdr: variadic
                     }));
                 }
                 new_env.vars.borrow_mut().insert(proc.args.ids.get(proc.args.required).unwrap().clone(), variadic);
