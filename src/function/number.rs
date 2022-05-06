@@ -117,7 +117,7 @@ pub fn mul(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environmen
                 match num {
                     &NumberKind::Int(i) => acc *= i,
                     &NumberKind::Float(f) => 
-                        return add_float(args, _env, (acc as f64) * f)
+                        return mul_float(args, _env, (acc as f64) * f)
                 }
             }
             _ => bail!("number required, but got {}", obj)
