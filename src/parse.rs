@@ -148,7 +148,7 @@ impl Parser {
                 .get(start..end)
                 .unwrap()
                 .parse()
-                .unwrap()))
+                .context("overflow")?))
 
         } else if RE_BOOL.is_match(input_from_cursor) {
             *cursor += 2;
