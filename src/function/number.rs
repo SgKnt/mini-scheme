@@ -22,9 +22,9 @@ pub fn add(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environmen
         match &*obj {
             Object::Number(num) => {
                 match num {
-                    NumberKind::Int(i) => acc += i,
-                    NumberKind::Float(f) => 
-                        return add_float(args, _env, f + (acc as f64))
+                    &NumberKind::Int(i) => acc += i,
+                    &NumberKind::Float(f) => 
+                        return add_float(args, _env, (acc as f64) + f)
                 }
             }
             _ => bail!("number required, but got {}", obj)
@@ -51,7 +51,7 @@ fn add_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environm
 }
 
 pub fn minus(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    let mut acc = 0;
+    let mut acc;
 
     let first = args.pop_front().unwrap()?;
     if let Object::Number(num) = &*first.borrow() {
@@ -74,9 +74,9 @@ pub fn minus(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environm
         match &*obj {
             Object::Number(num) => {
                 match num {
-                    NumberKind::Int(i) => acc -= i,
-                    NumberKind::Float(f) => 
-                        return minus_float(args, _env, f + (acc as f64))
+                    &NumberKind::Int(i) => acc -= i,
+                    &NumberKind::Float(f) => 
+                        return minus_float(args, _env, (acc as f64) - f)
                 }
             }
             _ => bail!("number required, but got {}", obj)
@@ -115,9 +115,9 @@ pub fn mul(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environmen
         match &*obj {
             Object::Number(num) => {
                 match num {
-                    NumberKind::Int(i) => acc *= i,
-                    NumberKind::Float(f) => 
-                        return add_float(args, _env, f * (acc as f64))
+                    &NumberKind::Int(i) => acc *= i,
+                    &NumberKind::Float(f) => 
+                        return add_float(args, _env, (acc as f64) * f)
                 }
             }
             _ => bail!("number required, but got {}", obj)
@@ -142,3 +142,51 @@ fn mul_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environm
     }
     Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
 }
+
+pub fn div(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let mut acc ;
+    let first = args.pop_front().unwrap()?;
+    if let Object::Number(num) = &*first.borrow() {
+        match num {
+            &NumberKind::Int(i) => acc = i as f64,
+            &NumberKind::Float(f) => acc = f,
+        }
+    } else {
+        bail!("number required, but got {}", first.borrow())
+    }
+
+    if args.len() == 0 {
+        // unary div
+        if acc == 0f64 {
+            bail!("zero division error");
+        } else {
+            return Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float((1 as f64) / acc)))))
+        }
+    }
+
+    while let Some(obj) = args.pop_front() {
+        let obj = obj?;
+        let obj = (*obj).borrow();
+        match &*obj {
+            Object::Number(num) => {
+                match num {
+                    &NumberKind::Int(i) => {
+                        if i == 0 {
+                            bail!("zero division error");
+                        }
+                        acc /= i as f64;
+                    }
+                    &NumberKind::Float(f) => {
+                        if f == 0.0 {
+                            bail!("zero division error");
+                        }
+                        acc /= f;
+                    }
+                }
+            }
+            _ => bail!("number required, but got {}", obj)
+        }
+    }
+    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
+}
+
