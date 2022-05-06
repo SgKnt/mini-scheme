@@ -64,6 +64,16 @@ impl Environment {
             required: 2,
             fun: function::number::ge
         }))));
+        vars.insert("boolean?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::bool::is_bool
+        }))));
+        vars.insert("not".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::bool::not
+        }))));
 
         Environment{
             vars: RefCell::new(vars),
