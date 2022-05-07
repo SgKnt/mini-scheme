@@ -76,7 +76,7 @@ impl Environment {
             required: 1,
             fun: function::bool::not
         }))));
-        // list
+        // pair, list
         vars.insert("null?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
             is_variadic: false,
             required: 1,
@@ -116,6 +116,31 @@ impl Environment {
             is_variadic: false,
             required: 1,
             fun: function::list::length
+        }))));
+        vars.insert("memq".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::list::memq
+        }))));
+        vars.insert("last".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::last
+        }))));
+        vars.insert("append".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 1,
+            fun: function::list::append
+        }))));
+        vars.insert("set-car!".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::list::set_car
+        }))));
+        vars.insert("set-cdr!".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::list::set_cdr
         }))));
         // symbol
         vars.insert("symbol?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{

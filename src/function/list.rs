@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 
 use crate::env::Environment;
 use crate::object::*;
@@ -86,6 +86,81 @@ fn length_inner(obj: &Rc<RefCell<Object>>, len: i64) -> core::result::Result<i64
     }
 }
 
-// pub fn memq(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+pub fn memq(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let obj = args.pop_front().unwrap()?;
+    let list = args.pop_front().unwrap()?;
+    memq_inner(&obj, &list)
+}
 
-// }
+fn memq_inner(obj: &Rc<RefCell<Object>>, list: &Rc<RefCell<Object>>) -> Result<Rc<RefCell<Object>>> {
+    match &*list.borrow() {
+        Object::Pair{car, cdr} => {
+            if obj.borrow().eq_scm(&*car.borrow()) {
+                Ok(Rc::clone(list))
+            } else {
+                memq_inner(obj, cdr)
+            }
+        }
+        _ => Ok(Rc::new(RefCell::new(Object::Boolean(false))))
+    }
+}
+
+pub fn last(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let pair = args.pop_front().unwrap()?;
+    last_inner(&pair)
+}
+
+fn last_inner(pair: &Rc<RefCell<Object>>) -> Result<Rc<RefCell<Object>>> {
+    match &*pair.borrow() {
+        Object::Pair{car, cdr} => match &*cdr.borrow() {
+            Object::Pair{..} => last_inner(cdr),
+            _ => Ok(Rc::clone(car)),
+        }
+        obj => Err(anyhow!("pair required, but got {}", obj))
+    }
+}
+
+pub fn append(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let mut res = args.pop_back().unwrap()?;
+    while let Some(list) = args.pop_back() {
+        res = append_inner(&list?, res)?
+    }
+    Ok(res)
+}
+
+fn append_inner(list1: &Rc<RefCell<Object>>, list2: Rc<RefCell<Object>>) -> Result<Rc<RefCell<Object>>> {
+    match &*list1.borrow() {
+        Object::Pair{car, cdr} => {
+            Ok(Rc::new(RefCell::new(Object::Pair{
+                car: Rc::clone(car),
+                cdr: append_inner(cdr, list2)?
+            })))
+        }
+        Object::Empty => Ok(list2),
+        _ => Err(anyhow!("proper list required, but got {}", list1.borrow()))
+    }
+}
+
+pub fn set_car(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let pair = args.pop_front().unwrap()?;
+    let obj = args.pop_front().unwrap()?;
+    match &mut*pair.borrow_mut() {
+        Object::Pair{car, ..} => {
+            *car = obj;
+        }
+        obj => bail!("pair required, but got {}", obj)
+    };
+    Ok(Rc::new(RefCell::new(Object::Undefined)))
+}
+
+pub fn set_cdr(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let pair = args.pop_front().unwrap()?;
+    let obj = args.pop_front().unwrap()?;
+    match &mut*pair.borrow_mut() {
+        Object::Pair{car:_, cdr} => {
+            *cdr = obj;
+        }
+        obj => bail!("pair required, but got {}", obj)
+    };
+    Ok(Rc::new(RefCell::new(Object::Undefined)))
+}
