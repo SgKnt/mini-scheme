@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-use anyhow::{Result};
+use anyhow::{Result, anyhow};
 
 use crate::env::Environment;
 use crate::object::*;
@@ -33,4 +33,39 @@ fn is_list_inner(obj: &Rc<RefCell<Object>>) -> Result<Rc<RefCell<Object>>> {
         Object::Empty => Ok(Rc::new(RefCell::new(Object::Boolean(true)))),
         _ => Ok(Rc::new(RefCell::new(Object::Boolean(false)))),
     }
+}
+
+pub fn car(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let arg = args.pop_front().unwrap()?;
+    let arg = arg.borrow();
+    match &*arg {
+        Object::Pair{car, ..} => Ok(Rc::clone(car)),
+        obj => Err(anyhow!("pair required, but got {}", obj))
+    }
+}
+
+pub fn cdr(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let arg = args.pop_front().unwrap()?;
+    let arg = arg.borrow();
+    match &*arg {
+        Object::Pair{car:_, cdr} => Ok(Rc::clone(cdr)),
+        obj => Err(anyhow!("pair required, but got {}", obj))
+    }
+}
+
+pub fn cons(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let car = args.pop_front().unwrap()?;
+    let cdr = args.pop_front().unwrap()?;
+    Ok(Rc::new(RefCell::new(Object::Pair{car, cdr})))
+}
+
+pub fn list(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let mut res = Rc::new(RefCell::new(Object::Empty));
+    while let Some(arg) = args.pop_back() {
+        res = Rc::new(RefCell::new(Object::Pair{
+            car: arg?,
+            cdr: res
+        }));
+    }
+    Ok(res)
 }

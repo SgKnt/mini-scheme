@@ -92,6 +92,32 @@ impl Environment {
             required: 1,
             fun: function::list::is_list
         }))));
+        vars.insert("car".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::car
+        }))));
+        vars.insert("cdr".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::cdr
+        }))));
+        vars.insert("cons".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::list::cons
+        }))));
+        vars.insert("list".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: true,
+            required: 0,
+            fun: function::list::list
+        }))));
+        // symbol
+        vars.insert("symbol?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::symbol::is_symbol
+        }))));
 
         Environment{
             vars: RefCell::new(vars),
