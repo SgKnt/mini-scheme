@@ -1,12 +1,16 @@
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::Read;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::path::Path;
 
 use anyhow::{Context, Result, anyhow, bail};
 
-use super::object::*;
-use super::token::*;
-use super::env::*;
+use crate::object::*;
+use crate::token::*;
+use crate::env::*;
+use crate::parse::Parser;
 
 pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
     // Exp, Define, (load String)
@@ -16,7 +20,7 @@ pub fn eval(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
                 eval_define(token, env)
             }
             Token::Id(id) if id == "load" => {
-                eval_load(&**cdr, env)
+                eval_load(token, &**cdr, env)
             }
             _ => eval_exp(token, env)
         }
@@ -55,8 +59,42 @@ pub fn eval_define(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Ob
     }
 }
 
-pub fn eval_load(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    todo!()
+pub fn eval_load(token: &Token, path: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    // argument "token" is for error messages
+    let (mut file, path_display) = match path {
+        Token::Pair{car, cdr} => {
+            if let Token::Empty = &**cdr {
+                if let Token::String(path) = &**car {
+                    let path = Path::new(&*path);
+                    match File::open(&path) {
+                        Ok(file) => (file, path.display()),
+                        Err(reason) => bail!("could't open {}: {}", path.display(), reason)
+                    }
+                } else {
+                    bail!("string required, but got {}", car);
+                }
+            } else {
+                bail!("syntax error: malformed load: {}", token)
+            }
+        }
+        _ => bail!("proper list required for function application or macro use: {}", token)
+    };
+
+    let mut buf = String::new();
+    let parser;
+    let tokens;
+    if let Err(reason) = file.read_to_string(&mut buf) {
+        bail!("could't read {}: {}", path_display, reason)
+    }
+    parser = Parser::new(buf);
+    tokens = parser.build_tokens();
+    for token in tokens {
+        match eval(&token?, env) {
+            Ok(res) => println!("{}", res.borrow()),
+            Err(reason) => println!("{}", reason),
+        }
+    }
+    Ok(Rc::new(RefCell::new(Object::Boolean(true))))
 }
 
 fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
