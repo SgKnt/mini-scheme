@@ -69,3 +69,23 @@ pub fn list(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environme
     }
     Ok(res)
 }
+
+pub fn length(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    let obj = args.pop_front().unwrap()?;
+    match length_inner(&obj, 0) {
+        Ok(len) => Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(len))))),
+        Err(_) => Err(anyhow!("proper list required, but got {}", obj.borrow()))
+    }
+}
+
+fn length_inner(obj: &Rc<RefCell<Object>>, len: i64) -> core::result::Result<i64, ()> {
+    match &*obj.borrow() {
+        Object::Pair{car:_, cdr} => length_inner(cdr, len + 1),
+        Object::Empty => Ok(len),
+        _ => Err(())
+    }
+}
+
+// pub fn memq(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+
+// }

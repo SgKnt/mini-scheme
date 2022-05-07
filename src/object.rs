@@ -54,6 +54,42 @@ impl Object {
             false
         }
     }
+
+    pub fn eq_scm(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Object::Number(lhs), Object::Number(rhs)) => {
+                match (lhs, rhs) {
+                    (NumberKind::Int(lhs), NumberKind::Int(rhs)) => lhs == rhs,
+                    (NumberKind::Float(lhs), NumberKind::Float(rhs)) => lhs == rhs,
+                    (_, _) => false
+                }
+            }
+            (Object::Boolean(lhs), Object::Boolean(rhs)) => lhs == rhs,
+            (Object::Symbol(lhs), Object::Symbol(rhs)) => lhs == rhs,
+            (Object::Empty, Object::Empty) => true,
+            (lhs, rhs) => (lhs as *const Self) == (rhs as *const Self),
+        }
+    }
+
+    pub fn equal_scm(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Object::Number(lhs), Object::Number(rhs)) => {
+                match (lhs, rhs) {
+                    (NumberKind::Int(lhs), NumberKind::Int(rhs)) => lhs == rhs,
+                    (NumberKind::Float(lhs), NumberKind::Float(rhs)) => lhs == rhs,
+                    (_, _) => false
+                }
+            }
+            (Object::Boolean(lhs), Object::Boolean(rhs)) => lhs == rhs,
+            (Object::Symbol(lhs), Object::Symbol(rhs)) => lhs == rhs,
+            (Object::String(lhs), Object::String(rhs)) => lhs == rhs,
+            (Object::Empty, Object::Empty) => true,
+            (Object::Pair{car: lcar, cdr: lcdr}, 
+                Object::Pair{car: rcar, cdr: rcdr})
+                => lcar.borrow().equal_scm(&*rcar.borrow()) && lcdr.borrow().equal_scm(&*rcdr.borrow()),
+            (lhs, rhs) => (lhs as *const Self) == (rhs as *const Self),
+        }
+    }
 }
 
 impl fmt::Display for Object {
@@ -89,7 +125,3 @@ impl fmt::Display for Object {
         }
     }
 }
-
-
-
-

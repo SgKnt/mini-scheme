@@ -112,11 +112,32 @@ impl Environment {
             required: 0,
             fun: function::list::list
         }))));
+        vars.insert("length".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::list::length
+        }))));
         // symbol
         vars.insert("symbol?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
             is_variadic: false,
             required: 1,
             fun: function::symbol::is_symbol
+        }))));
+        // comparison
+        vars.insert("eq?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::cmp::eq
+        }))));
+        vars.insert("neq?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::cmp::neq
+        }))));
+        vars.insert("equal?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::cmp::equal
         }))));
 
         Environment{
