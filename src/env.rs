@@ -148,6 +148,43 @@ impl Environment {
             required: 1,
             fun: function::symbol::is_symbol
         }))));
+        // procedure
+        vars.insert("procedure?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::procedure::is_procedure
+        }))));
+        // string
+        vars.insert("string?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::string::is_string
+        }))));
+        vars.insert("string-append".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 2,
+            fun: function::string::string_append
+        }))));
+        vars.insert("symbol->string".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::string::symbol_to_string
+        }))));
+        vars.insert("string->symbol".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::string::string_to_symbol
+        }))));
+        vars.insert("string->number".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::string::string_to_number
+        }))));
+        vars.insert("number->string".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
+            is_variadic: false,
+            required: 1,
+            fun: function::string::number_to_string
+        }))));
         // comparison
         vars.insert("eq?".to_string(), Rc::new(RefCell::new(Object::Subroutine(Subroutine{
             is_variadic: false,
