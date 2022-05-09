@@ -154,13 +154,98 @@ fn eval_exp(token: &Token, env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
                             }
                         }
                         "let" => {
-                            todo!()
+                            ensure_proper_list(cdr)?;
+                            match cdr.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                Token::Id(id) => {
+                                    let new_env = Rc::new(Environment::new(env));
+                                    let name = id.clone();
+                                    let bindings = cdr.nth(1).with_context(|| format!("syntax error: malformed let: {}", token))?;
+                                    let body = cdr.next().unwrap().next().with_context(|| format!("syntax error: malformed let: {}", token))?;
+                                    ensure_proper_list(bindings)?;
+
+                                    let mut args = Vec::new();
+                                    let mut inits = VecDeque::new();
+                                    for binding in bindings {
+                                        match binding.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                            Token::Id(id) => args.push(id.clone()),
+                                            t => bail!("syntax error: identifier required, but got {}", t),
+                                        };
+                                        inits.push_back(eval_exp(binding.nth(1).with_context(|| format!("syntax error: malformed let: {}", token))?, env)?);
+                                        if binding.nth(2).is_some() {
+                                            bail!("syntax error: malformed let: {}", token)
+                                        }
+                                    }
+                                    let proc = Rc::new(RefCell::new(Object::Procedure(Procedure{
+                                        env: Rc::clone(&new_env),
+                                        args: Args{ids: args.clone(), is_variadic: false, required: args.len()},
+                                        body: body.clone()
+                                    })));
+                                    new_env.vars.borrow_mut().insert(name, proc);
+                                    for arg in args {
+                                        new_env.vars.borrow_mut().insert(arg, inits.pop_front().unwrap());
+                                    }
+                                    eval_body(body, &new_env)
+                                }
+                                Token::Pair{..} => {
+                                    let bindings = cdr.nth(0).unwrap();
+                                    let body = cdr.next().with_context(|| format!("syntax error: malformed let: {}", token))?;
+                                    ensure_proper_list(bindings)?;
+                                    let new_env = Rc::new(Environment::new(env));
+                                    for binding in bindings {
+                                        let id = match binding.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                            Token::Id(id) => id.clone(),
+                                            t => bail!("syntax error: identifier required, but got {}", t),
+                                        };
+                                        new_env.vars.borrow_mut().insert(id, eval_exp(binding.nth(1).with_context(|| format!("syntax error: malformed let: {}", token))?, env)?);
+                                    }
+                                    eval_body(body, &new_env)
+                                }
+                                _ => Err(anyhow!("syntax error: malformed let: {}", token))
+                            }
                         }
                         "let*" => {
-                            todo!()
+                            ensure_proper_list(cdr)?;
+                            match cdr.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                Token::Pair{..} => {
+                                    let bindings = cdr.nth(0).unwrap();
+                                    let body = cdr.next().with_context(|| format!("syntax error: malformed let: {}", token))?;
+                                    ensure_proper_list(bindings)?;
+                                    let mut env = env.clone();
+                                    for binding in bindings {
+                                        let id = match binding.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                            Token::Id(id) => id.clone(),
+                                            t => bail!("syntax error: identifier required, but got {}", t),
+                                        };
+                                        let init = eval_exp(binding.nth(1).with_context(|| format!("syntax error: malformed let: {}", token))?, &env)?;
+                                        let new_env = Rc::new(Environment::new(&env));
+                                        new_env.vars.borrow_mut().insert(id, init);
+                                        env = new_env;
+                                    }
+                                    eval_body(body, &env)
+                                }
+                                _ => Err(anyhow!("syntax error: malformed let: {}", token))
+                            }
                         }
                         "letrec" => {
-                            todo!()
+                            ensure_proper_list(cdr)?;
+                            match cdr.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                Token::Pair{..} => {
+                                    let bindings = cdr.nth(0).unwrap();
+                                    let body = cdr.next().with_context(|| format!("syntax error: malformed let: {}", token))?;
+                                    ensure_proper_list(bindings)?;
+                                    let new_env = Rc::new(Environment::new(env));
+                                    for binding in bindings {
+                                        let id = match binding.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
+                                            Token::Id(id) => id.clone(),
+                                            t => bail!("syntax error: identifier required, but got {}", t),
+                                        };
+                                        let init = eval_exp(binding.nth(1).with_context(|| format!("syntax error: malformed let: {}", token))?, &new_env)?;
+                                        new_env.vars.borrow_mut().insert(id, init);
+                                    }
+                                    eval_body(body, &new_env)
+                                }
+                                _ => Err(anyhow!("syntax error: malformed let: {}", token))
+                            }
                         }
                         "if" => {
                             // (if exp1 exp2 exp3)
@@ -402,7 +487,7 @@ fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environmen
     while let Some(id) = arg.elem() {
         match id {
             Token::Id(id) => args.push(id.clone()),
-            _ => bail!("syntax error: argment must be identifier: {}", token),
+            _ => bail!("syntax error: identifier required, but got {}", token),
         }
         arg = arg.cdr().unwrap();
     }
@@ -423,7 +508,7 @@ fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: &Rc<Environmen
                 body: body.clone()
             }))))
         }
-        _ => Err(anyhow!("syntax error: argment must be identifier: {}", token))
+        _ => Err(anyhow!("syntax error: identifier required, but got {}", token))
     }
 }
 
