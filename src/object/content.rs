@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Result};
 
@@ -10,6 +10,7 @@ use super::Object;
 pub struct Content {
     pub mutable: bool,
     pub kind: ContentKind,
+    pub rc: u32,
 }
 
 pub enum ContentKind {

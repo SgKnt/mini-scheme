@@ -1,130 +1,244 @@
 mod content;
-mod memory;
+pub mod memory;
 
 use std::collections::VecDeque;
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::sync::Arc;
 use std::fmt;
 
 use anyhow::Result;
 
 use crate::env::Environment;
 use crate::token::Token;
+use content::{Content, ContentKind};
 
-pub enum Object {
-    Number(NumberKind),
+pub struct Object {
+    pointer: usize,
+    pub mutable: bool,
+    pub kind: ObjectKind,
+}
+
+#[derive(Clone)]
+pub enum ObjectKind {
+    Number(Number),
     Boolean(bool),
-    Pair{
-        car: Rc<RefCell<Object>>,
-        cdr: Rc<RefCell<Object>>,
-    },
-    Empty,
-    Procedure(Procedure),
-    Subroutine(Subroutine),
-    Symbol(String),
     String(String),
+    Symbol(String),
+    Empty,
+    Pair,
+    Procedure(Procedure),
     Undefined,
 }
 
-pub enum NumberKind {
+#[derive(Clone)]
+pub enum Number {
     Int(i64),
-    Float(f64)
+    Float(f64),
 }
 
-pub struct Procedure {
-    pub env: Rc<Environment>,
-    pub args: Args,
-    pub body: Token
-}
-
-pub struct Args {
-    pub ids: Vec<String>,
-    pub is_variadic: bool,
-    pub required: usize,
-}
-
-pub struct Subroutine {
-    pub required: usize,
-    pub is_variadic: bool,
-    pub fun: fn(VecDeque<Result<Rc<RefCell<Object>>>>, &Rc<Environment>) -> Result<Rc<RefCell<Object>>>
+#[derive(Clone)]
+pub enum Procedure {
+    Proc{
+        env: Arc<Environment>,
+        args: Vec<String>,
+        is_variadic: bool,
+        require: usize,
+        body: Token,
+    },
+    Subr{
+        is_variadic: bool,
+        require: usize,
+        fun: fn(VecDeque<Result<Object>>) -> Result<Object>,
+    }
 }
 
 impl Object {
-    pub fn is_falsy(&self) -> bool {
-        if let Object::Boolean(false) = self {
-            true
-        } else {
-            false
+    // Constructor
+    fn new_int(v: i64, mutable: bool) -> Self {
+        let new = Content{
+            mutable,
+            kind: ContentKind::Number(content::Number::Int(v)),
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object { 
+            pointer,
+            mutable,
+            kind: ObjectKind::Number(Number::Int(v))
         }
     }
 
-    pub fn eq_scm(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Object::Number(lhs), Object::Number(rhs)) => {
-                match (lhs, rhs) {
-                    (NumberKind::Int(lhs), NumberKind::Int(rhs)) => lhs == rhs,
-                    (NumberKind::Float(lhs), NumberKind::Float(rhs)) => lhs == rhs,
-                    (_, _) => false
-                }
-            }
-            (Object::Boolean(lhs), Object::Boolean(rhs)) => lhs == rhs,
-            (Object::Symbol(lhs), Object::Symbol(rhs)) => lhs == rhs,
-            (Object::Empty, Object::Empty) => true,
-            (lhs, rhs) => (lhs as *const Self) == (rhs as *const Self),
+    fn new_float(v: f64, mutable: bool) -> Self {
+        let new = Content{
+            mutable,
+            kind: ContentKind::Number(content::Number::Float(v)),
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object {
+            pointer,
+            mutable,
+            kind: ObjectKind::Number(Number::Float(v))
         }
     }
 
-    pub fn equal_scm(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Object::Number(lhs), Object::Number(rhs)) => {
-                match (lhs, rhs) {
-                    (NumberKind::Int(lhs), NumberKind::Int(rhs)) => lhs == rhs,
-                    (NumberKind::Float(lhs), NumberKind::Float(rhs)) => lhs == rhs,
-                    (_, _) => false
-                }
-            }
-            (Object::Boolean(lhs), Object::Boolean(rhs)) => lhs == rhs,
-            (Object::Symbol(lhs), Object::Symbol(rhs)) => lhs == rhs,
-            (Object::String(lhs), Object::String(rhs)) => lhs == rhs,
-            (Object::Empty, Object::Empty) => true,
-            (Object::Pair{car: lcar, cdr: lcdr}, 
-                Object::Pair{car: rcar, cdr: rcdr})
-                => lcar.borrow().equal_scm(&*rcar.borrow()) && lcdr.borrow().equal_scm(&*rcdr.borrow()),
-            (lhs, rhs) => (lhs as *const Self) == (rhs as *const Self),
+    fn new_boolean(v: bool, mutable: bool) -> Self {
+        let new = Content {
+            mutable,
+            kind: ContentKind::Boolean(v),
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object { 
+            pointer, 
+            mutable,
+            kind: ObjectKind::Boolean(v),
+        }
+    }
+
+    fn new_string(v: String, mutable: bool) -> Self {
+        let new = Content {
+            mutable,
+            kind: ContentKind::String(v),
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object { 
+            pointer, 
+            mutable,
+            kind: ObjectKind::String(v),
+        }
+    }
+
+    fn new_symbol(v: String, mutable: bool) -> Self {
+        let new = Content {
+            mutable,
+            kind: ContentKind::Symbol(v),
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object { 
+            pointer, 
+            mutable,
+            kind: ObjectKind::Symbol(v),
+        }
+    }
+
+    fn new_empty() -> Self {
+        {
+            let c_empty = memory::MEMORY
+            .get()
+            .unwrap()
+            .mem[0]
+            .lock()
+            .unwrap();
+            c_empty.unwrap().0.rc += 1;
+            c_empty.unwrap().1 = memory::Marker::Black;
+        }
+        Object {
+            pointer: 0,
+            mutable: false,
+            kind: ObjectKind::Empty,
+        }
+    }
+
+    fn new_pair(car: Object, cdr: Object, mutable: bool) -> Self {
+        let new = Content{
+            mutable,
+            kind: ContentKind::Pair{car: car.pointer, cdr: cdr.pointer},
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        {
+            memory::MEMORY
+                .get()
+                .unwrap()
+                .mem[car.pointer]
+                .lock()
+                .unwrap()
+                .expect("pair points None")
+                .1 = memory::Marker::Black;
+        }
+        {
+            memory::MEMORY
+                .get()
+                .unwrap()
+                .mem[cdr.pointer]
+                .lock()
+                .unwrap()
+                .expect("pair points None")
+                .1 = memory::Marker::Black;
+        }
+        Object {
+            mutable,
+            pointer,
+            kind: ObjectKind::Pair,
+        }
+    }
+
+    fn new_procedure(env: Arc<Environment>, args: Vec<String>, is_variadic: bool, require: usize, body: Token, mutable: bool) -> Self {
+        let new = Content {
+            mutable,
+            kind: ContentKind::Procedure(content::Procedure::Proc{
+                env: Arc::clone(&env),
+                args: args.clone(),
+                is_variadic,
+                require,
+                body: body.clone(),
+            }),
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object { 
+            pointer, 
+            mutable,
+            kind: ObjectKind::Procedure(Procedure::Proc{
+                env, args, is_variadic, require, body,
+            }),
+        }
+    }
+
+    fn new_undefined(mutable: bool) -> Self {
+        let new = Content {
+            mutable,
+            kind: ContentKind::Undefined,
+            rc: 1,
+        };
+        let pointer = memory::push(new);
+        Object { 
+            pointer, 
+            mutable,
+            kind: ObjectKind::Undefined,
         }
     }
 }
 
-impl fmt::Display for Object {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            Object::Number(num) => match num {
-                NumberKind::Int(i) => write!(f, "{}", i),
-                NumberKind::Float(fl) => write!(f, "{}", fl),
-            }
-            Object::Boolean(b) => {
-                if *b {
-                    write!(f, "#t")
-                } else {
-                    write!(f, "#f")
-                }
-            }
-            Object::Procedure(_) => write!(f, "#<procedure>"),
-            Object::Subroutine(_) => write!(f, "#<subroutine>"),
-            Object::String(s) => write!(f, "\"{}\"", s),
-            Object::Symbol(s) => write!(f, "{}", s),
-            Object::Undefined => write!(f, "#<undef>"),
-            Object::Empty => write!(f, "()"),
-            Object::Pair{car, cdr} => match &*(**cdr).borrow(){
-                Object::Pair{..} => {
-                    let cdr = format!("{}", (**cdr).borrow());
-                    write!(f, "({} {}", (**car).borrow(), cdr.split_at(1).1)
-                }
-                Object::Empty => {
-                    write!(f, "({})", (**car).borrow())
-                }
-                _ => write!(f, "({} . {})", (**car).borrow(), (**cdr).borrow())
-            }
+impl Clone for Object {
+    fn clone(&self) -> Self {
+        memory::MEMORY
+            .get()
+            .unwrap()
+            .mem[self.pointer]
+            .lock()
+            .unwrap()
+            .expect("exists object of None")
+            .0.rc += 1;
+        Object {
+            pointer: self.pointer,
+            mutable: self.mutable,
+            kind: self.kind.clone(),
         }
+    }
+}
+
+impl Drop for Object {
+    fn drop(&mut self) {
+        memory::MEMORY
+            .get()
+            .unwrap()
+            .mem[self.pointer]
+            .lock()
+            .unwrap()
+            .expect("exists object of None")
+            .0.rc -= 1;
     }
 }
