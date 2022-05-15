@@ -9,11 +9,12 @@ use self::object::*;
 use self::gc::Marker;
 use self::memory::Memory;
 use crate::data::env::EnvBody;
-use crate::token::Token;
+use crate::token::{Token, TokenIter};
 
 use std::cell::Cell;
 use std::collections::{VecDeque, HashMap};
 use std::fmt;
+use std::iter::{Iterator, IntoIterator};
 
 use anyhow::Result;
 
@@ -156,6 +157,10 @@ impl Object {
     pub fn kind(&self) -> &Kind {
         &self.re.borrow().kind
     }
+
+    pub fn is_list(&self) -> bool {
+        self.re.is_list()
+    }
 }
 
 impl Clone for Object {
@@ -177,6 +182,31 @@ impl fmt::Display for Object {
     }
 }
 
+/* scheme List to Iterator */
+pub struct SchemeListIter{
+    obj: Object,
+}
+
+impl IntoIterator for &Object {
+    type Item = Object;
+    type IntoIter = SchemeListIter;
+    fn into_iter(self) -> Self::IntoIter {
+        SchemeListIter{obj: self.clone()}
+    }
+}
+
+impl Iterator for SchemeListIter {
+    type Item = Object;
+    fn next(&mut self) -> Option<Self::Item> {
+        let (car, cdr) = if let Kind::Pair(pair) = self.obj.kind() {
+            (pair.car(), pair.cdr())
+        } else {
+            return None
+        };
+        self.obj = cdr;
+        Some(car)
+    }
+}
 
 /**
  * Environment: struct for scheme environment, used in evaluating input

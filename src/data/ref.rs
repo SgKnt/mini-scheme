@@ -1,5 +1,5 @@
 use super::{Object, Environment};
-use super::{object::ObjBody, env::EnvBody};
+use super::{object::*, env::EnvBody};
 
 use std::ptr::NonNull;
 
@@ -21,6 +21,14 @@ impl ObjRef {
     #[inline]
     pub(crate) unsafe fn borrow_mut(&self) -> &mut ObjBody {
         &mut *self.0.as_ptr()
+    }
+
+    pub(crate) fn is_list(&self) -> bool {
+        match &self.borrow().kind {
+            Kind::Pair(pair) => pair.car.is_list(),
+            Kind::Empty => true,
+            _ =>false,
+        }
     }
 }
 
