@@ -8,7 +8,7 @@ use std::io::{self, Write};
 
 use eval::eval;
 use parse::Parser;
-use data::*;
+use data::{*, memory::*};
 
 fn read_stdin() -> io::Result<String> {
     let mut buf = String::new();
@@ -53,6 +53,7 @@ fn at_unterminated_paren_or_string(buf: &str) -> bool {
 }
 
 fn main() {
+    Memory::init(1024);
     let global_env = Environment::new_global(Vec::new());
     loop {
         let input = read_stdin().unwrap();
@@ -73,5 +74,6 @@ fn main() {
                 Err(err) => println!("{:?}", err),
             }
         }
+        gc();
     }
 }

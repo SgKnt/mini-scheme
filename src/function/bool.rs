@@ -1,9 +1,8 @@
+use crate::data::{*, object::*};
+
 use std::collections::VecDeque;
 
 use anyhow::Result;
-
-use crate::data::*;
-use crate::data::object::*;
 
 pub fn is_bool(mut args: VecDeque<Object>) -> Result<Object> {
     match args.pop_front().unwrap().kind() {

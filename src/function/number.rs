@@ -1,8 +1,8 @@
+use crate::data::{*, object::*};
+
 use std::collections::VecDeque;
 
 use anyhow::{Result, bail, anyhow};
-
-use crate::data::{*, object::*};
 
 pub fn is_number(mut args: VecDeque<Object>) -> Result<Object> {
     match args.pop_front().unwrap().kind() {

@@ -1,15 +1,14 @@
 pub mod object;
 pub mod env;
 mod r#ref;
-mod memory;
-mod gc;
+pub mod memory;
 
 use self::r#ref::{ObjRef, EnvRef};
 use self::object::*;
-use self::gc::Marker;
+use self::memory::Marker;
 use self::memory::Memory;
 use crate::data::env::EnvBody;
-use crate::token::{Token, TokenIter};
+use crate::token::Token;
 
 use std::cell::Cell;
 use std::collections::{VecDeque, HashMap};

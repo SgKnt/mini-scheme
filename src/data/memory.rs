@@ -1,20 +1,24 @@
-use super::object::{ObjBody, Kind};
+use super::object::{ObjBody, Kind, Procedure};
 use super::env::EnvBody;
 use super::r#ref::{ObjRef, EnvRef};
-use super::gc::Marker;
 
 use std::cell::Cell;
 
-pub struct Memory {
-    obj_mem: Vec<ObjBody>,
-    env_mem: Vec<EnvBody>,
+pub(crate) struct Memory {
+    obj_mem: Vec<Box<ObjBody>>,
+    env_mem: Vec<Box<EnvBody>>,
     obj_size: usize,
     env_size: usize,
     max_size: usize,
     initialized: bool,
 }
+pub(crate) enum Marker {
+    Black,  // alive, finish
+    Gray,   // alive, searching
+    White,  // maybe dead
+}
 
-pub static mut MEMORY: Memory = Memory{
+pub(crate) static mut MEMORY: Memory = Memory{
     obj_mem: Vec::new(),
     env_mem: Vec::new(),
     obj_size: 0,
@@ -23,16 +27,121 @@ pub static mut MEMORY: Memory = Memory{
     initialized: false,
 };
 
+pub fn gc() {
+    Memory::ensure_initialized();
+    mark();
+    sweep();
+    unsafe {
+        MEMORY.obj_size = MEMORY.obj_mem.len();
+        MEMORY.env_size = MEMORY.env_mem.len();
+        if MEMORY.obj_size == MEMORY.max_size {
+            panic!("Memory overflow")
+        }
+    }
+}
+
+fn mark() {
+    unsafe {
+        // mark obj, env in stack
+        for obj in &mut MEMORY.obj_mem {
+            if obj.rc.get() > 0 {
+                obj.mark = Marker::Gray;
+            } else {
+                obj.mark = Marker::White;
+            }
+        }
+        for env in &mut MEMORY.env_mem {
+            if env.rc.get() > 0 {
+                env.mark = Marker::Black;
+            } else {
+                env.mark = Marker::White;
+            }
+        }
+
+        // mark obj, env which can be reached from obj, env in stack
+        for obj in &mut MEMORY.obj_mem {
+            if let Marker::Gray = obj.mark {
+                obj.mark = Marker::Black;
+                match &obj.kind {
+                    Kind::Pair(pair) => {
+                        mark_obj(&pair.car);
+                        mark_obj(&pair.cdr);
+                    }
+                    Kind::Procedure(proc) => {
+                        if let Procedure::Proc(proc) = proc {
+                            mark_env(&proc.env);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for env in &mut MEMORY.env_mem {
+            if let Marker::Gray = env.mark {
+                env.mark = Marker::Black;
+                for obj in env.vars.values() {
+                    mark_obj(obj);
+                }
+                if let Some(parent) = &env.parent {
+                    mark_env(parent);
+                }
+            }
+        }
+    }
+}
+
+fn mark_obj(obj: &ObjRef) {
+    if let Marker::Black = &obj.borrow().mark {
+        return
+    }
+
+    unsafe {obj.borrow_mut().mark = Marker::Black};
+    match &obj.borrow().kind {
+        Kind::Pair(pair) => {
+            mark_obj(&pair.car);
+            mark_obj(&pair.cdr);
+        }
+        Kind::Procedure(proc) => {
+            if let Procedure::Proc(proc) = proc {
+                mark_env(&proc.env);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn mark_env(env: &EnvRef) {
+    if let Marker::Black = &env.borrow().mark {
+        return;
+    }
+
+    unsafe {env.borrow_mut().mark = Marker::Black};
+    for obj in env.borrow().vars.values() {
+        mark_obj(obj);
+    }
+}
+
+fn sweep() {
+    unsafe {
+        MEMORY.obj_mem.retain(|obj| matches!(obj.mark, Marker::Black));
+        MEMORY.env_mem.retain(|env| matches!(env.mark, Marker::Black));
+    }
+}
+
+
+
 impl Memory {
     pub fn init(max: usize) {
         unsafe {
             MEMORY.max_size = max;
-            MEMORY.obj_mem.push(ObjBody{
+            MEMORY.obj_mem.push(Box::new(ObjBody{
                 is_mutable: false,
                 kind: Kind::Empty,
                 mark: Marker::Black,
                 rc: Cell::new(1),
-            })
+            }));
+            MEMORY.initialized = true;
         }
     }
 
@@ -44,13 +153,13 @@ impl Memory {
         }
     }
 
-    pub(crate) fn push_obj(mut obj: ObjBody) -> ObjRef {
+    pub(crate) fn push_obj(obj: ObjBody) -> ObjRef {
         Self::ensure_initialized();
-        let re = ObjRef::new(&mut obj);
+        let mut obj = Box::new(obj);
+        let re = ObjRef::new(&mut *obj.as_mut());
         unsafe {
-            if MEMORY.obj_size-1 == MEMORY.max_size {
-                // gc
-                todo!();
+            if MEMORY.obj_size == MEMORY.max_size-1 {
+                gc();
             }
             MEMORY.obj_size += 1;
             MEMORY.obj_mem.push(obj);
@@ -58,13 +167,13 @@ impl Memory {
         re
     }
 
-    pub(crate) fn push_env(mut env: EnvBody) -> EnvRef {
+    pub(crate) fn push_env(env: EnvBody) -> EnvRef {
         Self::ensure_initialized();
-        let re = EnvRef::new(&mut env);
+        let mut env = Box::new(env);
+        let re = EnvRef::new(&mut *env.as_mut());
         unsafe {
-            if MEMORY.env_size-1 == MEMORY.max_size {
-                // gc
-                todo!();
+            if MEMORY.env_size == MEMORY.max_size-1 {
+                gc();
             }
             MEMORY.env_size += 1;
             MEMORY.env_mem.push(env);
@@ -72,7 +181,7 @@ impl Memory {
         re
     }
 
-    pub fn get_empty() -> ObjRef {
+    pub(crate) fn get_empty() -> ObjRef {
         Self::ensure_initialized();
         unsafe {
             let mut empty = &mut MEMORY.obj_mem[0];

@@ -1,5 +1,5 @@
 use super::r#ref::{ObjRef, EnvRef};
-use super::gc::Marker;
+use super::memory::Marker;
 
 use std::cell::Cell;
 use std::collections::HashMap;
