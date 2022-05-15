@@ -1,6 +1,6 @@
 use super::r#ref::{ObjRef, EnvRef};
 use super::gc::Marker;
-use super::Object;
+use super::{Object, Environment};
 use crate::token::Token;
 
 use std::collections::VecDeque;
@@ -37,18 +37,22 @@ pub struct Pair {
 }
 
 pub enum Procedure {
-    Proc{
-        env: EnvRef,
-        args: Vec<String>,
-        is_variadic: bool,
-        require: usize,
-        body: Token,
-    },
-    Subr{
-        is_variadic: bool,
-        require: usize,
-        fun: fn(VecDeque<Result<Object>>) -> Result<Object>
-    }
+    Proc(Proc),
+    Subr(Subr),
+}
+
+pub struct Proc {
+    pub(crate) env: EnvRef,
+    pub args: Vec<String>,
+    pub is_variadic: bool,
+    pub require: usize,
+    pub body: Token,
+}
+
+pub struct Subr {
+    pub is_variadic: bool,
+    pub require: usize,
+    pub fun: fn(VecDeque<Object>) -> Result<Object>,
 }
 
 impl ObjBody {
@@ -64,7 +68,7 @@ impl ObjBody {
     }
 
     #[inline]
-    pub fn dec_rc(self) {
+    pub fn dec_rc(&self) {
         let rc = self.rc();
         if rc == 0 {
             // こうなると手遅れ unsafeを使いこなせていない
@@ -85,5 +89,13 @@ impl Pair {
         let re = self.cdr;
         re.borrow().inc_rc();
         Object{re}
+    }
+}
+
+impl Proc {
+    pub fn env(&self) -> Environment {
+        let env = self.env;
+        env.borrow().inc_rc();
+        Environment{re: env}
     }
 }

@@ -4,7 +4,7 @@ use super::gc::Marker;
 use std::cell::Cell;
 use std::collections::HashMap;
 
-pub struct EnvBody {
+pub(crate) struct EnvBody {
     pub vars: HashMap<String, ObjRef>,
     pub parent: Option<EnvRef>,
     pub mark: Marker,
@@ -24,7 +24,7 @@ impl EnvBody {
     }
 
     #[inline]
-    pub fn dec_rc(self) {
+    pub fn dec_rc(&self) {
         let rc = self.rc();
         if rc == 0 {
             panic!("An EnvBody which is already dead has been borrowed.");

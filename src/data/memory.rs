@@ -44,7 +44,7 @@ impl Memory {
         }
     }
 
-    pub fn push_obj(obj: ObjBody) -> ObjRef {
+    pub(crate) fn push_obj(mut obj: ObjBody) -> ObjRef {
         Self::ensure_initialized();
         let re = ObjRef::new(&mut obj);
         unsafe {
@@ -58,7 +58,7 @@ impl Memory {
         re
     }
 
-    pub fn push_env(env: EnvBody) -> EnvRef {
+    pub(crate) fn push_env(mut env: EnvBody) -> EnvRef {
         Self::ensure_initialized();
         let re = EnvRef::new(&mut env);
         unsafe {
@@ -75,7 +75,7 @@ impl Memory {
     pub fn get_empty() -> ObjRef {
         Self::ensure_initialized();
         unsafe {
-            let empty = &mut MEMORY.obj_mem[0];
+            let mut empty = &mut MEMORY.obj_mem[0];
             empty.inc_rc();
             ObjRef::new(&mut empty)
         }

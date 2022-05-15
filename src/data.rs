@@ -13,10 +13,12 @@ use crate::token::Token;
 
 use std::cell::Cell;
 use std::collections::{VecDeque, HashMap};
+use std::fmt;
 
 use anyhow::Result;
 
 // define Object and Environment
+// These structs follows Interior mutability pattern (擬き)
 
 /**
  * Object: struct for scheme object, used in evaluating input
@@ -45,6 +47,17 @@ impl Object {
         let body = ObjBody {
             is_mutable,
             kind: Kind::Number(Number::Float(f)),
+            mark: Marker::Black,
+            rc: Cell::new(1),
+        };
+        let re = Memory::push_obj(body);
+        Object{re}
+    }
+
+    pub fn new_boolean(b: bool, is_mutable: bool) -> Object {
+        let body = ObjBody {
+            is_mutable,
+            kind: Kind::Boolean(b),
             mark: Marker::Black,
             rc: Cell::new(1),
         };
@@ -95,10 +108,10 @@ impl Object {
     pub fn new_procedure(env: Environment, args: Vec<String>, is_variadic: bool, require: usize, body: Token) -> Object {
         let body = ObjBody {
             is_mutable: false,
-            kind: Kind::Procedure(Procedure::Proc{
+            kind: Kind::Procedure(Procedure::Proc(Proc{
                 env: env.re, 
                 args, is_variadic, require, body,
-            }),
+            })),
             mark: Marker::Black,
             rc: Cell::new(1),
         };
@@ -106,12 +119,23 @@ impl Object {
         Object{re}
     }
 
-    fn new_subroutine(is_variadic: bool, require: usize, fun: fn(VecDeque<Result<Object>>) -> Result<Object> ) -> Object {
+    fn new_subroutine(is_variadic: bool, require: usize, fun: fn(VecDeque<Object>) -> Result<Object> ) -> Object {
         let body = ObjBody {
             is_mutable: false,
-            kind: Kind::Procedure(Procedure::Subr{
+            kind: Kind::Procedure(Procedure::Subr(Subr{
                 is_variadic, require, fun,
-            }),
+            })),
+            mark: Marker::Black,
+            rc: Cell::new(1),
+        };
+        let re = Memory::push_obj(body);
+        Object{re}
+    }
+
+    pub fn new_undefined() -> Object {
+        let body = ObjBody {
+            is_mutable: false,
+            kind: Kind::Undefined,
             mark: Marker::Black,
             rc: Cell::new(1),
         };
@@ -147,6 +171,12 @@ impl Drop for Object {
     }
 }
 
+impl fmt::Display for Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
 
 /**
  * Environment: struct for scheme environment, used in evaluating input
@@ -159,12 +189,12 @@ pub struct Environment{
 }
 
 impl Environment {
-    pub fn new_global(subrs: Vec<(String, bool, usize, fn(VecDeque<Result<Object>>) -> Result<Object>)>) -> Self {
+    pub fn new_global(subrs: Vec<(String, bool, usize, fn(VecDeque<Object>) -> Result<Object>)>) -> Self {
         // lib[i].0: function name in scheme
         // lib[i].1: is variadic function? 
         // lib[i].2: number of required argument
         // lib[i].3: function
-        let vars: HashMap<String, ObjRef> = HashMap::new();
+        let mut vars: HashMap<String, ObjRef> = HashMap::new();
         for subr in subrs {
             let name = subr.0;
             let subr = Object::new_subroutine(subr.1, subr.2, subr.3);
@@ -191,12 +221,27 @@ impl Environment {
         Environment{re}
     }
 
+    pub fn parent(&self) -> Option<Environment> {
+        if let Some(parent) = self.re.borrow().parent {
+            parent.borrow().inc_rc();
+            Some(Environment{re: parent})
+        } else {
+            None
+        }
+    }
+
     pub fn lookup(&self, id: &String) -> Option<Object> {
         self.re.lookup(id)
     }
 
-    pub fn containt_at(&self, id: &String) -> Option<Environment> {
+    pub fn contains_at(&self, id: &String) -> Option<Environment> {
         self.re.contains_at(id)
+    }
+
+    pub fn insert(&self, id: String, obj: Object) {
+        unsafe {
+            self.re.borrow_mut().vars.insert(id, obj.re);
+        }
     }
 }
 
