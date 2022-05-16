@@ -179,6 +179,10 @@ impl Memory {
         for obj in env.borrow().vars.values() {
             Self::mark_obj(obj);
         }
+
+        if let Some(parent) = &env.borrow().parent {
+            Self::mark_env(parent);
+        }
     }
     
     fn sweep() {
