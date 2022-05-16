@@ -54,7 +54,7 @@ fn at_unterminated_paren_or_string(buf: &str) -> bool {
 
 fn main() {
     Memory::init(1024);
-    let global_env = Environment::new_global(Vec::new());
+    let global_env = Environment::new_global(function::make_lib());
     loop {
         let input = read_stdin().unwrap();
         if input.len() == 0 {
