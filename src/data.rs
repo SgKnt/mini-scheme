@@ -177,7 +177,7 @@ impl Drop for Object {
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "")
+        self.re.fmt(f)
     }
 }
 
@@ -224,9 +224,8 @@ impl Environment {
         // lib[i].2: number of required argument
         // lib[i].3: function
         let mut vars: HashMap<String, ObjRef> = HashMap::new();
-        for subr in subrs {
-            let name = subr.0;
-            let subr = Object::new_subroutine(subr.1, subr.2, subr.3);
+        for (name, is_variadic, require, fun) in subrs {
+            let subr = Object::new_subroutine(is_variadic, require, fun);
             vars.insert(name, subr.re);
         }
         let body = EnvBody {

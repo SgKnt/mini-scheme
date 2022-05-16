@@ -74,6 +74,6 @@ fn main() {
                 Err(err) => println!("{:?}", err),
             }
         }
-        gc();
+        Memory::gc();
     }
 }

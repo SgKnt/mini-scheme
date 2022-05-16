@@ -71,7 +71,6 @@ impl ObjBody {
     pub fn dec_rc(&self) {
         let rc = self.rc();
         if rc == 0 {
-            // こうなると手遅れ unsafeを使いこなせていない
             panic!("An ObjBody which is already dead has been borrowed.");
         }
         self.rc.set(rc - 1);
