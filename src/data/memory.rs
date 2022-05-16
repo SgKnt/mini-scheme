@@ -111,7 +111,7 @@ impl Memory {
             }
             for env in &mut MEMORY.env_mem {
                 if env.rc.get() > 0 {
-                    env.mark = Marker::Black;
+                    env.mark = Marker::Gray;
                 } else {
                     env.mark = Marker::White;
                 }
