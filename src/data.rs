@@ -15,7 +15,7 @@ use std::collections::{VecDeque, HashMap};
 use std::fmt;
 use std::iter::{Iterator, IntoIterator};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow, bail};
 
 // define Object and Environment
 // These structs follows Interior mutability pattern (擬き)
@@ -159,6 +159,44 @@ impl Object {
 
     pub fn is_list(&self) -> bool {
         self.re.is_list()
+    }
+
+    pub fn length(&self) -> Option<usize> {
+        self.re.length()
+    }
+
+    pub fn scm_eq(&self, other: &Object) -> bool {
+        ObjRef::scm_eq(&self.re, &other.re)
+    } 
+
+    pub fn scm_equal(&self, other: &Object) -> bool {
+        ObjRef::scm_equal(&self.re, &other.re)
+    }
+
+    pub fn set_car(&self, car: Object) -> Result<()> {
+        if !self.re.borrow().is_mutable {
+            bail!("got immutable object {}", self)
+        }
+        unsafe {
+            match &mut self.re.borrow_mut().kind {
+                Kind::Pair(pair) => pair.car = car.re,
+                _ => return Err(anyhow!("pair required, but got {}", self))
+            };
+        }
+        Ok(())
+    }
+
+    pub fn set_cdr(&self, cdr: Object) -> Result<()> {
+        if !self.re.borrow().is_mutable {
+            bail!("got immutable object {}", self)
+        }
+        unsafe {
+            match &mut self.re.borrow_mut().kind {
+                Kind::Pair(pair) => pair.cdr = cdr.re,
+                _ => return Err(anyhow!("not pair"))
+            };
+        }
+        Ok(())
     }
 }
 

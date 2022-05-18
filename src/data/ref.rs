@@ -26,10 +26,92 @@ impl ObjRef {
     }
 
     pub(crate) fn is_list(&self) -> bool {
-        match &self.borrow().kind {
-            Kind::Pair(pair) => pair.car.is_list(),
-            Kind::Empty => true,
-            _ =>false,
+        // Floyd's cycle-finding algorithm
+        let mut fast = self;
+        let mut slow = self;
+        loop {
+            match &fast.borrow().kind {
+                Kind::Pair(pair) => {
+                    fast = &pair.cdr;
+                    if fast == slow {
+                        break false;
+                    }
+                    match &fast.borrow().kind {
+                        Kind::Pair(pair) => fast = &pair.cdr,
+                        Kind::Empty => break true,
+                        _ => break false,
+                    }
+                    match &slow.borrow().kind {
+                        Kind::Pair(pair) => slow = &pair.cdr,
+                        _ => unreachable!(),
+                    }
+                }
+                Kind::Empty => break true,
+                _ => break false,
+            }
+        }
+    }
+
+    pub(crate) fn length(&self) -> Option<usize> {
+        // Floyd's cycle-finding algorithm
+        let mut len: usize = 0;
+        let mut fast = self;
+        let mut slow = self;
+        loop {
+            match &fast.borrow().kind {
+                Kind::Pair(pair) => {
+                    len += 1;
+                    fast = &pair.cdr;
+                    if fast == slow {
+                        break None;
+                    }
+                    match &fast.borrow().kind {
+                        Kind::Pair(pair) => {
+                            len += 1;
+                            fast = &pair.cdr;
+                        }
+                        Kind::Empty => break Some(len),
+                        _ => break None,
+                    }
+                    match &slow.borrow().kind {
+                        Kind::Pair(pair) => slow = &pair.cdr,
+                        _ => unreachable!(),
+                    }
+                }
+                Kind::Empty => break Some(len),
+                _ => break None,
+            }
+        }
+    }
+
+    pub(crate) fn scm_eq(&self, other: &ObjRef) -> bool {
+        match (&self.borrow().kind, &other.borrow().kind) {
+            (Kind::Number(lhs), Kind::Number(rhs)) => match (lhs, rhs) {
+                (Number::Int(lhs), Number::Int(rhs)) => lhs == rhs,
+                (Number::Float(lhs), Number::Float(rhs)) => lhs == rhs,
+                (_, _) => false,
+            }
+            (Kind::Boolean(lhs), Kind::Boolean(rhs)) => lhs == rhs,
+            (Kind::Symbol(lhs), Kind::Symbol(rhs)) => lhs == rhs,
+            (Kind::Empty, Kind::Empty) => true,
+            (_, _) => self == other, 
+        }
+    }
+
+    pub(crate) fn scm_equal(&self, other: &ObjRef) -> bool {
+        match (&self.borrow().kind, &other.borrow().kind) {
+            (Kind::Number(lhs), Kind::Number(rhs)) => match (lhs, rhs) {
+                (Number::Int(lhs), Number::Int(rhs)) => lhs == rhs,
+                (Number::Float(lhs), Number::Float(rhs)) => lhs == rhs,
+                (_, _) => false,
+            }
+            (Kind::Boolean(lhs), Kind::Boolean(rhs)) => lhs == rhs,
+            (Kind::Symbol(lhs), Kind::Symbol(rhs)) => lhs == rhs,
+            (Kind::String(lhs), Kind::String(rhs)) => lhs == rhs,
+            (Kind::Empty, Kind::Empty) => true,
+            (Kind::Pair(lhs), Kind::Pair(rhs))
+                => ObjRef::scm_equal(&lhs.car, &rhs.car) && ObjRef::scm_equal(&lhs.cdr, &rhs.cdr),
+            (_, _) => self == other,
         }
     }
 }
