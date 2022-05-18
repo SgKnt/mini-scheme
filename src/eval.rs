@@ -148,7 +148,8 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                             ensure_proper_list(cdr)?;
                             match cdr.nth(0).with_context(|| format!("syntax error: malformed let: {}", token))? {
                                 Token::Id(id) => {
-                                    let new_env = Environment::new(env.clone());
+                                    let name_env = Environment::new(env.clone());
+                                    let new_env = Environment::new(name_env.clone());
                                     let name = id.clone();
                                     let bindings = cdr.nth(1).with_context(|| format!("syntax error: malformed let: {}", token))?;
                                     let body = cdr.next().unwrap().next().with_context(|| format!("syntax error: malformed let: {}", token))?;
@@ -166,8 +167,8 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                                             bail!("syntax error: malformed let: {}", token)
                                         }
                                     }
-                                    let proc = Object::new_procedure(env.clone(), args.clone(), false, args.len(), body.clone());
-                                    new_env.insert(name, proc);
+                                    let proc = Object::new_procedure(name_env.clone(), args.clone(), false, args.len(), body.clone());
+                                    name_env.insert(name, proc);
                                     for arg in args {
                                         new_env.insert(arg, inits.pop_front().unwrap());
                                     }
@@ -277,7 +278,6 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
 
                             let mut res = Ok(Object::new_undefined());
                             for clause in &**cdr {
-                                println!("debug: clause = {}", clause);
                                 if let Token::Pair{car: test, cdr: exps} = clause {
                                     if exps.is_empty() || !exps.is_list() {
                                         bail!("syntax error: bad clause in cond: {}", token);
@@ -293,6 +293,7 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                                                     for exp in &**exps {
                                                         res = Ok(eval_exp(exp, env.clone())?);
                                                     }
+                                                    break;
                                                 } else {
                                                     continue;
                                                 }
