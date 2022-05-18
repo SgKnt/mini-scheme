@@ -2,7 +2,7 @@ pub mod number;
 pub mod bool;
 pub mod list;
 // pub mod symbol;
-// pub mod cmp;
+pub mod cmp;
 // pub mod string;
 // pub mod procedure;
 
@@ -28,7 +28,7 @@ pub fn make_lib() -> Vec<(String, bool, usize, fn(VecDeque<Object>) -> Result<Ob
     // boolean
     lib.push(("boolean?".to_string(), false, 1, bool::is_bool));
     lib.push(("not".to_string(), false, 1, bool::not));
-    //pair, list
+    // pair, list
     lib.push(("null?".to_string(), false, 1, list::is_null));
     lib.push(("pair?".to_string(), false, 1, list::is_pair));
     lib.push(("list?".to_string(), false, 1, list::is_list));
@@ -42,6 +42,12 @@ pub fn make_lib() -> Vec<(String, bool, usize, fn(VecDeque<Object>) -> Result<Ob
     lib.push(("append".to_string(), true, 1, list::append));
     lib.push(("set-car!".to_string(), false, 2, list::set_car));
     lib.push(("set-cdr!".to_string(), false, 2, list::set_cdr));
+    // symbol
+    // procedure
+    // comparison
+    lib.push(("eq?".to_string(), false, 2, cmp::eq));
+    lib.push(("neq?".to_string(), false, 2, cmp::neq));
+    lib.push(("equal?".to_string(), false, 2, cmp::equal));
 
     lib
 }
