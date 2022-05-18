@@ -2,7 +2,6 @@ use super::{Object, Environment};
 use super::{object::*, env::EnvBody};
 
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter};
 use std::ptr::NonNull;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -122,60 +121,59 @@ struct ObjRefDisplayState {
 }
 
 impl ObjRef {
-    fn display(&self, f: &mut Formatter<'_>, state: &mut ObjRefDisplayState) -> std::fmt::Result {
+    pub fn to_string(&self) -> String {
+        
+        let mut state = ObjRefDisplayState{obj_tag: HashMap::new(), exists: HashSet::new()};
+        self._to_string(&mut state)
+    }
+
+    fn _to_string(&self, state: &mut ObjRefDisplayState) -> String {
         match &self.borrow().kind {
             Kind::Number(num) => match num {
-                Number::Int(i) => write!(f, "{}", i),
-                Number::Float(fl) => write!(f, "{}", fl),
+                Number::Int(i) => i.to_string(),
+                Number::Float(f) => f.to_string(),
             }
-            Kind::Boolean(b) if *b => write!(f, "#t"),
-            Kind::Boolean(_) => write!(f, "#f"),
-            Kind::String(s) => write!(f, r#""{}""#, s),
-            Kind::Symbol(s) => write!(f, "{}", s),
-            Kind::Empty => write!(f, "()"),
+            Kind::Boolean(b) if *b => "#t".to_string(),
+            Kind::Boolean(_) => "#f".to_string(),
+            Kind::String(s) => format!(r#""{}""#, s),
+            Kind::Symbol(s) => s.clone(),
+            Kind::Empty => "()".to_string(),
             Kind::Procedure(proc) => match proc {
-                Procedure::Proc(_) => write!(f, "#<procedure>"),
-                Procedure::Subr(_) => write!(f, "#<subroutine>"),
+                Procedure::Proc(_) => "#<procedure>".to_string(),
+                Procedure::Subr(_) => "#<subroutine>".to_string(),
             }
-            Kind::Undefined => write!(f, "#<undef>"),
+            Kind::Undefined => "#<undef>".to_string(),
             Kind::Pair(pair) => {
                 if let Some(tag) = state.obj_tag.get(self) {
-                    write!(f, "#{}#", tag)
+                    format!("#{}#", tag)
                 } else if let Some(_) = state.exists.take(self) {
                     let tag = state.obj_tag.len();
                     state.obj_tag.insert(*self, tag);
-                    write!(f, "#{}#", tag)
+                    format!("#{}#", tag)
                 } else {
                     state.exists.insert(*self);
-                    let car = format!("{}", pair.car);
-                    let cdr = format!("{}", pair.cdr);
+                    let car = pair.car._to_string(state);
+                    let cdr = pair.cdr._to_string(state);
                     if let Some(tag) = state.obj_tag.get(self) {
                         if cdr == "()" {
-                            write!(f, "#{}=({})", tag, car)
+                            format!("#{}=({})", tag, car)
                         } else if cdr.starts_with('(') {
-                            write!(f, "#{}=({} {}", tag, car, cdr.split_at(1).1)
+                            format!("#{}=({} {}", tag, car, cdr.split_at(1).1)
                         } else {
-                            write!(f, "#{}=({} . {})", tag, car, cdr)
+                            format!("#{}=({} . {})", tag, car, cdr)
                         }
                     } else {
                         if cdr == "()" {
-                            write!(f, "({})", car)
+                            format!("({})", car)
                         } else if cdr.starts_with('(') {
-                            write!(f, "({} {}", car, cdr.split_at(1).1)
+                            format!("({} {}", car, cdr.split_at(1).1)
                         } else {
-                            write!(f, "({} . {})", car, cdr)
+                            format!("({} . {})", car, cdr)
                         }
                     }
                 }
             }
         }
-    }
-}
-
-impl Display for ObjRef {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut state = ObjRefDisplayState{obj_tag: HashMap::new(), exists: HashSet::new()};
-        self.display(f, &mut state)
     }
 }
 

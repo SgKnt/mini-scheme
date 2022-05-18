@@ -215,7 +215,7 @@ impl Drop for Object {
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.re.fmt(f)
+        write!(f, "{}", self.re.to_string())
     }
 }
 

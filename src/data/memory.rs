@@ -13,8 +13,8 @@ pub(crate) struct Memory {
     initialized: bool,
 }
 pub(crate) enum Marker {
-    Black,  // alive, finish
-    Gray,   // alive, searching
+    Black,  // alive, finish search
+    Gray,   // alive, in search
     White,  // maybe dead
 }
 
