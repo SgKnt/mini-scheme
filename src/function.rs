@@ -1,10 +1,10 @@
 pub mod number;
 pub mod bool;
 pub mod list;
-// pub mod symbol;
+pub mod symbol;
 pub mod cmp;
-// pub mod string;
-// pub mod procedure;
+pub mod string;
+pub mod procedure;
 
 use crate::data::Object;
 
@@ -42,8 +42,17 @@ pub fn make_lib() -> Vec<(String, bool, usize, fn(VecDeque<Object>) -> Result<Ob
     lib.push(("append".to_string(), true, 1, list::append));
     lib.push(("set-car!".to_string(), false, 2, list::set_car));
     lib.push(("set-cdr!".to_string(), false, 2, list::set_cdr));
+    // string
+    lib.push(("string?".to_string(), false, 1, string::is_string));
+    lib.push(("string-append".to_string(), false, 2, string::string_append));
+    lib.push(("symbol->string".to_string(), false, 1, string::symbol_to_string));
+    lib.push(("string->symbol".to_string(), false, 1, string::string_to_symbol));
+    lib.push(("string->number".to_string(), false, 1, string::string_to_number));
+    lib.push(("number->string".to_string(), false, 1, string::number_to_string));
     // symbol
+    lib.push(("symbol?".to_string(), false, 1, symbol::is_symbol));
     // procedure
+    lib.push(("procedure?".to_string(), false, 1, procedure::is_procedure));
     // comparison
     lib.push(("eq?".to_string(), false, 2, cmp::eq));
     lib.push(("neq?".to_string(), false, 2, cmp::neq));

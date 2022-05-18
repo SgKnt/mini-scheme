@@ -1,65 +1,68 @@
-use std::cell::RefCell;
+use crate::data::{*, object::*};
+
 use std::collections::VecDeque;
-use std::rc::Rc;
 
 use anyhow::{Result, anyhow};
 
-use crate::env::Environment;
-use crate::object::*;
-
-pub fn is_string(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match &*args.pop_front().unwrap()?.borrow() {
-        Object::String(_) => Ok(Rc::new(RefCell::new(Object::Boolean(true)))),
-        _ => Ok(Rc::new(RefCell::new(Object::Boolean(false)))),
+pub fn is_string(mut args: VecDeque<Object>) -> Result<Object> {
+    match args.pop_front().unwrap().kind() {
+        Kind::String(_) => Ok(Object::new_boolean(true, true)),
+        _               => Ok(Object::new_boolean(false, true)),
     }
 }
 
-pub fn string_append(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match (&*args.pop_front().unwrap()?.borrow(), &*args.pop_front().unwrap()?.borrow()) {
-        (Object::String(s1), Object::String(s2)) => {
+pub fn string_append(mut args: VecDeque<Object>) -> Result<Object> {
+    let obj1 = args.pop_front().unwrap();
+    let obj2 = args.pop_front().unwrap();
+    match (obj1.kind(), obj2.kind()) {
+        (Kind::String(s1), Kind::String(s2)) => {
             let s = s1.clone() + s2;
-            Ok(Rc::new(RefCell::new(Object::String(s))))
+            Ok(Object::new_string(s, true))
         }
-        (Object::String(_), obj) => Err(anyhow!("string required, but got {}", obj)),
-        (obj, _) => Err(anyhow!("string required, but got {}", obj)),
+        (Kind::String(_), _) => Err(anyhow!("string required, but got {}", obj2)),
+        (_, _) => Err(anyhow!("string required, but got {}", obj1)),
     }
 }
 
-pub fn symbol_to_string(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match &*args.pop_front().unwrap()?.borrow() {
-        Object::Symbol(s) => Ok(Rc::new(RefCell::new(Object::String(s.clone())))),
-        obj => Err(anyhow!("symbol required, but got {}", obj)),
+pub fn symbol_to_string(mut args: VecDeque<Object>) -> Result<Object> {
+    let obj = args.pop_front().unwrap();
+    match obj.kind() {
+        Kind::Symbol(s) => Ok(Object::new_string(s.clone(), true)),
+        _ => Err(anyhow!("symbol required, but got {}", obj))
     }
 }
 
-pub fn string_to_symbol(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match &*args.pop_front().unwrap()?.borrow() {
-        Object::String(s) => Ok(Rc::new(RefCell::new(Object::Symbol(s.clone())))),
-        obj => Err(anyhow!("string required, but got {}", obj)),
+pub fn string_to_symbol(mut args: VecDeque<Object>) -> Result<Object> {
+    let obj = args.pop_front().unwrap();
+    match obj.kind() {
+        Kind::String(s) => Ok(Object::new_symbol(s.clone(), true)),
+        _ => Err(anyhow!("string required, but got {}", obj)),
     }
 }
 
-pub fn string_to_number(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match &*args.pop_front().unwrap()?.borrow() {
-        Object::String(s) => {
+pub fn string_to_number(mut args: VecDeque<Object>) -> Result<Object> {
+    let obj = args.pop_front().unwrap();
+    match obj.kind() {
+        Kind::String(s) => {
             if let Ok(i) = s.parse::<i64>() {
-                Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(i)))))
+                Ok(Object::new_int(i, true))
             } else if let Ok(f) = s.parse::<f64>() {
-                Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(f)))))
+                Ok(Object::new_float(f, true))
             } else {
-                Ok(Rc::new(RefCell::new(Object::Boolean(false))))
+                Ok(Object::new_boolean(false, true))
             }
         }
-        obj => Err(anyhow!("string required, but got {}", obj)),
+        _ => Err(anyhow!("string required, but got {}", obj))
     }
 }
 
-pub fn number_to_string(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match &*args.pop_front().unwrap()?.borrow() {
-        Object::Number(num) => match num {
-            NumberKind::Int(i) => Ok(Rc::new(RefCell::new(Object::String(i.to_string())))),
-            NumberKind::Float(f) => Ok(Rc::new(RefCell::new(Object::String(f.to_string())))),
+pub fn number_to_string(mut args: VecDeque<Object>) -> Result<Object> {
+    let obj = args.pop_front().unwrap();
+    match obj.kind() {
+        Kind::Number(num) => match num {
+            &Number::Int(i) => Ok(Object::new_int(i, true)),
+            &Number::Float(f) => Ok(Object::new_float(f, true)),
         }
-        obj => Err(anyhow!("symbol required, but got {}", obj)),
+        _ => Err(anyhow!("string required, but got {}", obj))
     }
 }
