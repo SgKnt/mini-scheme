@@ -1,157 +1,125 @@
-use std::cell::RefCell;
+use crate::data::{*, object::*};
+
 use std::collections::VecDeque;
-use std::rc::Rc;
 
 use anyhow::{Result, bail, anyhow};
 
-use crate::env::Environment;
-use crate::object::*;
-
-pub fn is_number(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    match &*args.pop_front().unwrap()?.borrow() {
-        Object::Number(_) => Ok(Rc::new(RefCell::new(Object::Boolean(true)))),
-        _ => Ok(Rc::new(RefCell::new(Object::Boolean(false)))),
+pub fn is_number(mut args: VecDeque<Object>) -> Result<Object> {
+    match args.pop_front().unwrap().kind() {
+        Kind::Number(_) => Ok(Object::new_boolean(true, true)),
+        _ => Ok(Object::new_boolean(false, true)),
     }
 }
 
-pub fn add(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+pub fn add(mut args: VecDeque<Object>) -> Result<Object> {
     let mut acc = 0;
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => acc += i,
-                    &NumberKind::Float(f) => 
-                        return add_float(args, _env, (acc as f64) + f)
-                }
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => acc += i,
+                &Number::Float(f) => return add_float(args, (acc as f64) + f)
             }
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(acc)))))
+    Ok(Object::new_int(acc, true))
 }
 
-fn add_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>, mut acc: f64) -> Result<Rc<RefCell<Object>>> {
+fn add_float(mut args: VecDeque<Object>, mut acc: f64) -> Result<Object> {
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => acc += i as f64,
-                    &NumberKind::Float(f) => acc += f,
-                }
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => acc += i as f64,
+                &Number::Float(f) => acc += f,
             }
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
+    Ok(Object::new_float(acc, true))
 }
 
-pub fn minus(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+pub fn minus(mut args: VecDeque<Object>) -> Result<Object> {
     let mut acc;
 
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => acc = i,
-            &NumberKind::Float(f) => return minus_float(args, _env, f),
+            &Number::Int(i) => acc = i,
+            &Number::Float(f) => return minus_float(args, f),
         };
     } else {
         bail!("number required, but got {}", first)
     }
 
     if args.len() == 0 {
-        // unary minus
-        return Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(-acc)))));
+        return Ok(Object::new_int(-acc, true));
     }
 
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => acc -= i,
-                    &NumberKind::Float(f) => 
-                        return minus_float(args, _env, (acc as f64) - f)
-                }
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => acc -= i,
+                &Number::Float(f) => return minus_float(args, (acc as f64) - f),
             }
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(acc)))))
+    
+    Ok(Object::new_int(acc, true))
 }
 
-fn minus_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>, mut acc: f64) -> Result<Rc<RefCell<Object>>> {
-    if args.len() == 0 {
-        // unary minus
-        return Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(-acc)))));
+fn minus_float(mut args: VecDeque<Object>, mut acc: f64) -> Result<Object> {
+    if args.len() == 0{
+        return Ok(Object::new_float(-acc, true));
     }
 
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => acc -= i as f64,
-                    &NumberKind::Float(f) => acc -= f,
-                }
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => acc -= i as f64,
+                &Number::Float(f) => acc -= f,
             }
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
-}
 
-pub fn mul(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+    Ok(Object::new_float(acc, true))
+} 
+
+pub fn mul(mut args: VecDeque<Object>) -> Result<Object> {
     let mut acc = 1;
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => acc *= i,
-                    &NumberKind::Float(f) => 
-                        return mul_float(args, _env, (acc as f64) * f)
-                }
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => acc *= i,
+                &Number::Float(f) => return mul_float(args, (acc as f64) * f)
             }
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Int(acc)))))
+    Ok(Object::new_int(acc, true))
 }
 
-fn mul_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>, mut acc: f64) -> Result<Rc<RefCell<Object>>> {
+fn mul_float(mut args: VecDeque<Object>, mut acc: f64) -> Result<Object> {
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => acc *= i as f64,
-                    &NumberKind::Float(f) => acc *= f,
-                }
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => acc *= i as f64,
+                &Number::Float(f) => acc *= f,
             }
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
+    Ok(Object::new_float(acc, true))
 }
 
-pub fn div(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+pub fn div(mut args: VecDeque<Object>) -> Result<Object> {
     let mut acc ;
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => acc = i as f64,
-            &NumberKind::Float(f) => acc = f,
+            &Number::Int(i) => acc = i as f64,
+            &Number::Float(f) => acc = f,
         };
     } else {
         bail!("number required, but got {}", first)
@@ -162,403 +130,355 @@ pub fn div(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environmen
         if acc == 0f64 {
             bail!("zero division error");
         } else {
-            return Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float((1 as f64) / acc)))))
+            return Ok(Object::new_float((1 as f64) / acc, true));
         }
     }
 
     while let Some(obj) = args.pop_front() {
-        let obj = obj?;
-        let obj = obj.borrow();
-        match &*obj {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(i) => {
-                        if i == 0 {
-                            bail!("zero division error");
-                        }
-                        acc /= i as f64;
+        match obj.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(i) => {
+                    if i == 0 {
+                        bail!("zero division error");
                     }
-                    &NumberKind::Float(f) => {
-                        if f == 0.0 {
-                            bail!("zero division error");
-                        }
-                        acc /= f;
+                    acc /= i as f64;
+                }
+                &Number::Float(f) => {
+                    if f == 0.0 {
+                        bail!("zero division error");
                     }
+                    acc /= f;
                 }
             }
+            
             _ => bail!("number required, but got {}", obj)
         }
     }
-    Ok(Rc::new(RefCell::new(Object::Number(NumberKind::Float(acc)))))
+    Ok(Object::new_float(acc, true))
 }
 
-pub fn eq(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
+pub fn eq(mut args: VecDeque<Object>) -> Result<Object> {
     // binary op "=" 
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => eq_int(args, i),
-            &NumberKind::Float(f) => eq_float(args, f),
+            &Number::Int(i) => eq_int(args, i),
+            &Number::Float(f) => eq_float(args, f),
         }
     } else {
         Err(anyhow!("number required, but got {}", first))
     }
 }
 
-fn eq_int(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: i64) -> Result<Rc<RefCell<Object>>> {
+fn eq_int(mut args: VecDeque<Object>, op1: i64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if op1 != op2 {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            eq_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if op1 != op2 {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        eq_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if (op1 as f64) != op2 {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            eq_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if (op1 as f64) != op2 {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        eq_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-fn eq_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: f64) -> Result<Rc<RefCell<Object>>> {
+fn eq_float(mut args: VecDeque<Object>, op1: f64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if op1 != (op2 as f64) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            eq_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if op1 != (op2 as f64) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        eq_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if op1 != op2 {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            eq_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if op1 != op2 {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        eq_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-pub fn lt(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    // binary op "<" 
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+pub fn lt(mut args: VecDeque<Object>) -> Result<Object> {
+    // binary op "=" 
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => lt_int(args, i),
-            &NumberKind::Float(f) => lt_float(args, f),
+            &Number::Int(i) => lt_int(args, i),
+            &Number::Float(f) => lt_float(args, f),
         }
     } else {
         Err(anyhow!("number required, but got {}", first))
     }
 }
 
-fn lt_int(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: i64) -> Result<Rc<RefCell<Object>>> {
+fn lt_int(mut args: VecDeque<Object>, op1: i64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 < op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            lt_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 < op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        lt_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !((op1 as f64) < op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            lt_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !((op1 as f64) < op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        lt_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-fn lt_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: f64) -> Result<Rc<RefCell<Object>>> {
+fn lt_float(mut args: VecDeque<Object>, op1: f64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 < (op2 as f64)) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            lt_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 < (op2 as f64)) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        lt_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !(op1 < op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            lt_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !(op1 < op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        lt_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-pub fn le(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    // binary op "<" 
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+pub fn le(mut args: VecDeque<Object>) -> Result<Object> {
+    // binary op "=" 
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => le_int(args, i),
-            &NumberKind::Float(f) => le_float(args, f),
+            &Number::Int(i) => le_int(args, i),
+            &Number::Float(f) => le_float(args, f),
         }
     } else {
         Err(anyhow!("number required, but got {}", first))
     }
 }
 
-fn le_int(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: i64) -> Result<Rc<RefCell<Object>>> {
+fn le_int(mut args: VecDeque<Object>, op1: i64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 <= op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            le_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 <= op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        le_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !((op1 as f64) <= op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            le_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !((op1 as f64) <= op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        le_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-fn le_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: f64) -> Result<Rc<RefCell<Object>>> {
+fn le_float(mut args: VecDeque<Object>, op1: f64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 <= (op2 as f64)) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            le_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 <= (op2 as f64)) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        le_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !(op1 <= op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            le_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !(op1 <= op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        le_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-pub fn gt(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    // binary op "<" 
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+pub fn gt(mut args: VecDeque<Object>) -> Result<Object> {
+    // binary op "=" 
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => gt_int(args, i),
-            &NumberKind::Float(f) => gt_float(args, f),
+            &Number::Int(i) => gt_int(args, i),
+            &Number::Float(f) => gt_float(args, f),
         }
     } else {
         Err(anyhow!("number required, but got {}", first))
     }
 }
 
-fn gt_int(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: i64) -> Result<Rc<RefCell<Object>>> {
+fn gt_int(mut args: VecDeque<Object>, op1: i64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 > op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            gt_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 > op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        gt_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !((op1 as f64) > op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            gt_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !((op1 as f64) > op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        gt_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-fn gt_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: f64) -> Result<Rc<RefCell<Object>>> {
+fn gt_float(mut args: VecDeque<Object>, op1: f64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 > (op2 as f64)) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            gt_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 > (op2 as f64)) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        gt_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !(op1 > op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            gt_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !(op1 > op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        gt_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-pub fn ge(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, _env: &Rc<Environment>) -> Result<Rc<RefCell<Object>>> {
-    // binary op "<" 
-    let first = args.pop_front().unwrap()?;
-    let first = first.borrow();
-    if let Object::Number(num) = &*first {
+pub fn ge(mut args: VecDeque<Object>) -> Result<Object> {
+    // binary op "=" 
+    let first = args.pop_front().unwrap();
+    if let Kind::Number(num) = first.kind() {
         match num {
-            &NumberKind::Int(i) => ge_int(args, i),
-            &NumberKind::Float(f) => ge_float(args, f),
+            &Number::Int(i) => ge_int(args, i),
+            &Number::Float(f) => ge_float(args, f),
         }
     } else {
         Err(anyhow!("number required, but got {}", first))
     }
 }
 
-fn ge_int(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: i64) -> Result<Rc<RefCell<Object>>> {
+fn ge_int(mut args: VecDeque<Object>, op1: i64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 >= op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            ge_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 >= op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        ge_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !((op1 as f64) >= op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            ge_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !((op1 as f64) >= op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        ge_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 
-fn ge_float(mut args: VecDeque<Result<Rc<RefCell<Object>>>>, op1: f64) -> Result<Rc<RefCell<Object>>> {
+fn ge_float(mut args: VecDeque<Object>, op1: f64) -> Result<Object> {
     if let Some(op2) = args.pop_front() {
-        let op2 = op2?;
-        let op2 = op2.borrow();
-        match &*op2 {
-            Object::Number(num) => {
-                match num {
-                    &NumberKind::Int(op2) => {
-                        if !(op1 >= (op2 as f64)) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            ge_int(args, op2)
-                        }
+        match op2.kind() {
+            Kind::Number(num) => match num {
+                &Number::Int(op2) => {
+                    if !(op1 >= (op2 as f64)) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        ge_int(args, op2)
                     }
-                    &NumberKind::Float(op2) => {
-                        if !(op1 >= op2) {
-                            Ok(Rc::new(RefCell::new(Object::Boolean(false))))
-                        } else {
-                            ge_float(args, op2)
-                        }
+                }
+                &Number::Float(op2) => {
+                    if !(op1 >= op2) {
+                        Ok(Object::new_boolean(false, true))
+                    } else {
+                        ge_float(args, op2)
                     }
                 }
             }
             _ => Err(anyhow!("number required, but got {}", op2))
         }
     } else {
-        Ok(Rc::new(RefCell::new(Object::Boolean(true))))
+        Ok(Object::new_boolean(true, true))
     }
 }
 

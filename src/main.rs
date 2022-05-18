@@ -1,17 +1,14 @@
 mod parse;
 mod token;
-mod object;
-//mod val;
-mod env;
+mod data;
 mod eval;
 mod function;
 
 use std::io::{self, Write};
-use std::rc::Rc;
 
-use env::Environment;
 use eval::eval;
 use parse::Parser;
+use data::{*, memory::*};
 
 fn read_stdin() -> io::Result<String> {
     let mut buf = String::new();
@@ -56,7 +53,8 @@ fn at_unterminated_paren_or_string(buf: &str) -> bool {
 }
 
 fn main() {
-    let global_env = Rc::new(Environment::new_global());
+    Memory::init(1024);
+    let global_env = Environment::new_global(function::make_lib());
     loop {
         let input = read_stdin().unwrap();
         if input.len() == 0 {
@@ -67,14 +65,15 @@ fn main() {
         for token in &tokens {
             match token {
                 Ok(token) => {
-                    let res = eval(token, &global_env);
+                    let res = eval(token, global_env.clone());
                     match res {
-                        Ok(obj) => println!("{}", obj.borrow()),
+                        Ok(obj) => println!("{}", obj),
                         Err(err) => println!("{:?}", err),
                     }
                 }
                 Err(err) => println!("{:?}", err),
             }
         }
+        Memory::gc();
     }
 }
