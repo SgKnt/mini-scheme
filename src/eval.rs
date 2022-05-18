@@ -45,7 +45,7 @@ pub fn eval_define(token: &Token, env: Environment) -> Result<Object> {
         Token::Pair{car: id, cdr: args} => {
             if let Token::Id(id) = &**id {
                 let body = token.next().unwrap();
-                let obj = eval_lambda(token, args, body, env.clone())?;
+                let obj = eval_lambda(args, body, env.clone())?;
                 env.insert(id.clone(), obj);
                 Ok(Object::new_symbol(id.clone(), false))
             } else {
@@ -117,7 +117,7 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                             ensure_proper_list(cdr)?;
                             let arg = cdr.elem().with_context(|| format!("syntax error: malformed lambda: {}", token))?;
                             let body = cdr.next().unwrap();
-                            eval_lambda(token, arg, body, env)
+                            eval_lambda(arg, body, env)
                         },
                         "quote" => {
                             eval_quote(cdr)
@@ -474,12 +474,12 @@ fn eval_app(token: &Token, proc: &Token, args: &Token, env: Environment) -> Resu
     }
 }
 
-fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: Environment) -> Result<Object> {
+fn eval_lambda(mut arg: &Token, body: &Token, env: Environment) -> Result<Object> {
     let mut args = Vec::new();
     while let Some(id) = arg.elem() {
         match id {
             Token::Id(id) => args.push(id.clone()),
-            _ => bail!("syntax error: identifier required, but got {}", token),
+            _ => bail!("syntax error: identifier required, but got {}", id),
         }
         arg = arg.cdr().unwrap();
     }
@@ -492,7 +492,7 @@ fn eval_lambda(token: &Token, mut arg: &Token, body: &Token, env: Environment) -
         Token::Empty => {
             Ok(Object::new_procedure(env, args, false, require, body.clone()))
         }
-        _ => Err(anyhow!("syntax error: identifier required, but got {}", token))
+        _ => Err(anyhow!("syntax error: identifier required, but got {}", arg))
     }
 }
 
