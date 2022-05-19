@@ -5,6 +5,7 @@ pub mod symbol;
 pub mod cmp;
 pub mod string;
 pub mod procedure;
+pub mod display;
 
 use crate::data::Object;
 
@@ -57,6 +58,9 @@ pub fn make_lib() -> Vec<(String, bool, usize, fn(VecDeque<Object>) -> Result<Ob
     lib.push(("eq?".to_string(), false, 2, cmp::eq));
     lib.push(("neq?".to_string(), false, 2, cmp::neq));
     lib.push(("equal?".to_string(), false, 2, cmp::equal));
+
+    // additional
+    lib.push(("display".to_string(), false, 1, display::display));
 
     lib
 }
