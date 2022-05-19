@@ -62,7 +62,7 @@ fn main() {
         }
         let lex = Parser::new(input);
         let tokens = lex.build_tokens();
-        for token in &tokens {
+        for token in tokens {
             match token {
                 Ok(token) => {
                     let res = eval(token, global_env.clone());
