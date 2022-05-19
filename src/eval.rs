@@ -345,14 +345,14 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                             if !val_init_steps.is_list() {
                                 bail!("syntax error: malformed do: {}", token);
                             }
-                            let mut vals: Vec<&str> = Vec::new();
+                            let mut vals: Vec<String> = Vec::new();
                             let mut steps: Vec<&Token> = Vec::new();
                             for val_init_step in val_init_steps {
                                 let val = val_init_step.nth(0).with_context(|| format!("syntax error: malformed do: {}", token))?;
                                 let init = val_init_step.nth(1).with_context(|| format!("syntax error: malformed do: {}", token))?;
                                 let step = val_init_step.nth(2).with_context(|| format!("syntax error: malformed do: {}", token))?;
                                 if let Token::Id(id) = val {
-                                    vals.push(id.as_ref());
+                                    vals.push(id.clone());
                                     do_env.insert(id.clone(), eval_exp(init, env.clone())?);
                                 } else {
                                     bail!("syntax error: malformed do: {}", token);
@@ -379,12 +379,19 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                                 .next()
                                 .with_context(|| format!("syntax error: malformed do: {}", token))?;
                             
-                            while !eval_exp(test, do_env.clone())?.is_falsy() {
+                            while eval_exp(test, do_env.clone())?.is_falsy() {
                                 eval_body(cmds, do_env.clone())?;
+                                for i in 0..vals.len() {
+                                    do_env.insert(
+                                        vals.get(i).unwrap().clone(),
+                                        eval_exp(steps.get(i).unwrap(), do_env.clone())?
+                                    );
+                                }
                             }
 
                             let mut res = Object::new_undefined();
-                            for exp in test_exp.next() {
+                            for exp in test_exp.next().unwrap() {
+                                println!("{}", exp);
                                 res = eval_exp(exp, do_env.clone())?;
                             }
                             Ok(res)
