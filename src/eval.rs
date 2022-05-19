@@ -276,27 +276,49 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                                 bail!("syntax error: at least one clause is required for cond: {}", token);
                             }
 
-                            let mut res = Ok(Object::new_undefined());
+                            let mut res = Object::new_undefined();
                             for clause in &**cdr {
                                 if let Token::Pair{car: test, cdr: exps} = clause {
-                                    if exps.is_empty() || !exps.is_list() {
+                                    if exps.is_empty() {
                                         bail!("syntax error: bad clause in cond: {}", token);
-                                    } else {
-                                        match &**test {
-                                            Token::Id(s) if s == "else" => {
-                                                for exp in &**exps {
-                                                    res = Ok(eval_exp(exp, env.clone())?);
+                                    }
+                                    match &**test {
+                                        Token::Id(s) if s == "else" => {
+                                            let mut exps = &**exps;
+                                            loop {
+                                                match exps {
+                                                    Token::Empty => break,
+                                                    Token::Pair{car: exp, cdr: next_exps} => {
+                                                        res = eval_exp(exp, env.clone())?;
+                                                        if let Token::Empty = &**next_exps {
+                                                            break;
+                                                        }
+                                                        exps = next_exps;
+                                                    }
+                                                    _ => bail!("syntax error: bad clause in cond: {}", token)
                                                 }
                                             }
-                                            _ => {
-                                                if !eval_exp(test, env.clone())?.is_falsy() {
-                                                    for exp in &**exps {
-                                                        res = Ok(eval_exp(exp, env.clone())?);
+                                            break;
+                                        }
+                                        _ => {
+                                            let mut exps = &**exps;
+                                            if !eval_exp(test, env.clone())?.is_falsy() {
+                                                loop {
+                                                    match exps {
+                                                        Token::Empty => break,
+                                                        Token::Pair{car: exp, cdr: next_exps} => {
+                                                            res = eval_exp(exp, env.clone())?;
+                                                            if let Token::Empty = &**next_exps {
+                                                                break;
+                                                            }
+                                                            exps = next_exps;
+                                                        }
+                                                        _ => bail!("syntax error: bad clause in cond: {}", token)
                                                     }
-                                                    break;
-                                                } else {
-                                                    continue;
                                                 }
+                                                break;
+                                            } else {
+                                                continue;
                                             }
                                         }
                                     }
@@ -304,35 +326,69 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                                     bail!("syntax error: bad clause in cond: {}", token);
                                 }
                             }
-                            res
+                            Ok(res)
                         }
                         "and" => {
                             ensure_proper_list(cdr)?;
                             let mut res = Object::new_boolean(true, true);
-                            for test in &**cdr {
-                                res = eval_exp(test, env.clone())?;
-                                if res.is_falsy() {
-                                    break;
+                            let mut tests = cdr.as_ref();
+                            loop {
+                                match tests {
+                                    Token::Empty => break,
+                                    Token::Pair{car: test, cdr: next_tests} => {
+                                        res = eval_exp(test, env.clone())?;
+                                        if let Token::Empty = **next_tests {
+                                            break;
+                                        } else if res.is_falsy() {
+                                           break;
+                                        } else {
+                                            tests = &**next_tests
+                                        }
+                                    }
+                                    _ => unreachable!()
                                 }
-                            }
+                            };
                             Ok(res)
                         }
                         "or" => {
                             ensure_proper_list(cdr)?;
                             let mut res = Object::new_boolean(false, true);
-                            for test in &**cdr {
-                                res = eval_exp(test, env.clone())?;
-                                if !res.is_falsy() {
-                                    break;
+                            let mut tests = cdr.as_ref();
+                            loop {
+                                match tests {
+                                    Token::Empty => break,
+                                    Token::Pair{car: test, cdr: next_tests} => {
+                                        res = eval_exp(test, env.clone())?;
+                                        if let Token::Empty = **next_tests {
+                                            break;
+                                        } else if !res.is_falsy() {
+                                           break;
+                                        } else {
+                                            tests = &**next_tests
+                                        }
+                                    }
+                                    _ => unreachable!()
                                 }
-                            }
+                            };
                             Ok(res)
                         }
                         "begin" => {
                             ensure_proper_list(cdr)?;
                             let mut res = Object::new_undefined();
-                            for exp in &**cdr {
-                                res = eval_exp(exp, env.clone())?;
+                            let mut exps = &**cdr;
+                            loop {
+                                match exps {
+                                    Token::Empty => break,
+                                    Token::Pair{car: exp, cdr: next_exps} => {
+                                        res = eval_exp(exp, env.clone())?;
+                                        if let Token::Empty = &**cdr {
+                                            break;
+                                        } else {
+                                            exps = &**next_exps;
+                                        }
+                                    }
+                                    _ => unreachable!()
+                                }
                             }
                             Ok(res)
                         }
@@ -390,9 +446,20 @@ fn eval_exp(token: &Token, env: Environment) -> Result<Object> {
                             }
 
                             let mut res = Object::new_undefined();
-                            for exp in test_exp.next().unwrap() {
-                                println!("{}", exp);
-                                res = eval_exp(exp, do_env.clone())?;
+                            let mut exps = test_exp.next().unwrap();
+                            loop {
+                                match exps {
+                                    Token::Empty => break,
+                                    Token::Pair{car: exp, cdr: next_exps} => {
+                                        res = eval_exp(exp, do_env.clone())?;
+                                        if let Token::Empty = &**cdr {
+                                            break;
+                                        } else {
+                                            exps = &**next_exps;
+                                        }
+                                    }
+                                    _ => unreachable!()
+                                }
                             }
                             Ok(res)
                         }
