@@ -3,12 +3,17 @@ mod token;
 mod data;
 mod eval;
 mod function;
+mod opt;
 
 use std::io::{self, Write};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 use eval::eval;
 use parse::Parser;
 use data::{*, memory::*};
+use clap::Parser as _;
 
 fn read_stdin() -> io::Result<String> {
     let mut buf = String::new();
@@ -52,9 +57,45 @@ fn at_unterminated_paren_or_string(buf: &str) -> bool {
     nest != 0 || in_str
 }
 
+fn load_file(env: Environment) {
+    let opt = opt::Opt::parse();
+    match opt.files {
+        Some(files) => {
+            for file_name in files {
+                let path = Path::new(&file_name);
+                let mut buf = String::new();
+                let mut file = match File::open(&path) {
+                    Ok(file) => file,
+                    Err(reason) => {
+                        println!("could't open {}: {}", file_name, reason);
+                        continue;
+                    }
+                };
+                if let Err(reason) = file.read_to_string(&mut buf) {
+                    println!("could't read {}: {}", file_name, reason)
+                }
+                let parser = Parser::new(buf);
+                let tokens = parser.build_tokens();
+                for token in tokens {
+                    match token {
+                        Ok(token) => match eval(token, env.clone()) {
+                            Ok(_) => {},
+                            Err(reason) => println!("{}", reason),
+                        }
+                        Err(reason) => println!("{}", reason),
+                    }
+                    
+                }
+            }
+        }
+        None => {}
+    }
+}
+
 fn main() {
-    Memory::init(1024);
+    Memory::init(2048);
     let global_env = Environment::new_global(function::make_lib());
+    load_file(global_env.clone());
     loop {
         let input = read_stdin().unwrap();
         if input.len() == 0 {
@@ -68,7 +109,7 @@ fn main() {
                     let res = eval(token, global_env.clone());
                     match res {
                         Ok(obj) => println!("{}", obj),
-                        Err(err) => println!("{:?}", err),
+                        Err(err) => println!("{}", err),
                     }
                 }
                 Err(err) => println!("{:?}", err),
