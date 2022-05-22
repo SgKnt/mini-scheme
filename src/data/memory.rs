@@ -54,7 +54,7 @@ impl Memory {
         let mut obj = Box::new(obj);
         let re = ObjRef::new(obj.as_mut());
         unsafe {
-            if MEMORY.obj_size == MEMORY.max_size-1 {
+            if MEMORY.obj_size >= MEMORY.max_size-1 {
                 Self::gc();
             }
             MEMORY.obj_size += 1;
@@ -93,7 +93,7 @@ impl Memory {
         unsafe {
             MEMORY.obj_size = MEMORY.obj_mem.len();
             MEMORY.env_size = MEMORY.env_mem.len();
-            if MEMORY.obj_size == MEMORY.max_size {
+            if MEMORY.obj_size >= MEMORY.max_size {
                 panic!("Memory overflow")
             }
         }

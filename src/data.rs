@@ -22,7 +22,7 @@ use anyhow::{Result, anyhow, bail};
 
 /**
  * Object: struct for scheme object, used in evaluating input
- * The entity is object::ObjBody. 
+ * The entity of object is object::ObjBody. 
  * The interpreter accesses an object through this object.
  */
 

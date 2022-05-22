@@ -87,7 +87,7 @@ pub fn eval_load(token: &Token, path: &Token, env: Environment) -> Result<Object
     tokens = parser.build_tokens();
     for token in tokens {
         match eval(token?, env.clone()) {
-            Ok(res) => println!("{}", res),
+            Ok(_) => {},
             Err(reason) => println!("{}", reason),
         }
     }
