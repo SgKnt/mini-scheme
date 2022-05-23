@@ -80,9 +80,9 @@ fn load_file(env: Environment) {
                     match token {
                         Ok(token) => match eval(token, env.clone()) {
                             Ok(_) => {},
-                            Err(reason) => println!("{}", reason),
+                            Err(reason) => println!("[ERROR] {}", reason),
                         }
-                        Err(reason) => println!("{}", reason),
+                        Err(reason) => println!("[ERROR] {}", reason),
                     }
                     
                 }
@@ -109,10 +109,10 @@ fn main() {
                     let res = eval(token, global_env.clone());
                     match res {
                         Ok(obj) => println!("{}", obj),
-                        Err(err) => println!("{}", err),
+                        Err(err) => println!("[ERROR] {}", err),
                     }
                 }
-                Err(err) => println!("{:?}", err),
+                Err(err) => println!("[ERROR] {}", err),
             }
         }
         Memory::gc();

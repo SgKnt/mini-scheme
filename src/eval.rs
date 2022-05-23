@@ -278,6 +278,7 @@ fn eval_exp(mut token: Token, mut env: Environment) -> Result<Object> {
                                         if !exp3_cdr.is_empty() {
                                             break 'exp Err(anyhow!("syntax error: malformed if: {}", &token));
                                         } else if !cond.is_falsy() {
+                                            // return eval_exp(token, env)
                                             token = exp2.clone();
                                             continue 'exp;
                                         } else {
