@@ -1,5 +1,6 @@
 # mini-scheme
-Interpreter of Scheme subset written in Rust
+Interpreter of Scheme subset written in Rust  
+A work product of https://github.com/psg-titech/NewcomerProject  
 
 ## Usage
 ### Build
